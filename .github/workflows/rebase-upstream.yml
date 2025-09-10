@@ -1,0 +1,22 @@
+name: Rebase Upstream
+
+on:
+  schedule:
+    - cron: '17 4 * * *'   # 11:17 UTC+7
+    - cron: '17 12 * * *'  # 19:17 UTC+7
+  workflow_dispatch:
+
+jobs:
+  rebase:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+
+      - run: |
+          set -ex
+          git remote add upstream https://github.com/KyberNetwork/kyberswap-interface.git
+          git fetch upstream main --depth=20
+          git rebase upstream/main
+          git push origin $(git branch --show-current) --force-with-lease
