@@ -3,15 +3,16 @@ import { Trans, t } from '@lingui/macro'
 import { useEffect, useMemo, useState } from 'react'
 import { Check, Info, Repeat } from 'react-feather'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { useGetListOrdersQuery, useGetTotalActiveMakingAmountQuery } from 'services/limitOrder'
+import { useGetTotalActiveMakingAmountQuery } from 'services/limitOrder'
 import { calculatePriceImpact } from 'services/route/utils'
 
 import { ButtonOutlined, ButtonPrimary } from 'components/Button'
-import { AutoColumn } from 'components/Column'
+import Dots from 'components/Dots'
 import InfoHelper from 'components/InfoHelper'
+import { LimitOrderStatus, LimitOrderTab } from 'components/LimitOrder/types'
 import Loader from 'components/Loader'
-import { RowBetween } from 'components/Row'
 import SlippageWarningNote from 'components/SlippageWarningNote'
+import { HStack, Stack } from 'components/Stack'
 import PriceImpactNote from 'components/SwapForm/PriceImpactNote'
 import { useSwapFormContext } from 'components/SwapForm/SwapFormContext'
 import SwapBrief from 'components/SwapForm/SwapModal/SwapBrief'
@@ -23,9 +24,7 @@ import { BuildRouteResult } from 'components/SwapForm/hooks/useBuildRoute'
 import { MouseoverTooltip } from 'components/Tooltip'
 import { TransactionErrorContent } from 'components/TransactionConfirmationModal'
 import WarningNote from 'components/WarningNote'
-import { calcPercentFilledOrder } from 'components/swapv2/LimitOrder/helpers'
-import { LimitOrderStatus, LimitOrderTab } from 'components/swapv2/LimitOrder/type'
-import { Dots, StyledBalanceMaxMini } from 'components/swapv2/styleds'
+import { StyledBalanceMaxMini } from 'components/swapv2/styleds'
 import { TOKEN_API_URL } from 'constants/env'
 import { APP_PATHS, PAIR_CATEGORY } from 'constants/index'
 import { useActiveWeb3React } from 'hooks'
@@ -44,6 +43,15 @@ import { checkPriceImpact } from 'utils/prices'
 const SHOW_ACCEPT_NEW_AMOUNT_THRESHOLD = -1
 const AMOUNT_OUT_FROM_BUILD_ERROR_THRESHOLD = -5
 const SHOW_CONFIRM_MODAL_AFTER_CLICK_SWAP_THRESHOLD = -10
+
+const ReservedOrderNotice = ({ symbol, to }: { symbol: string | undefined; to: string }) => (
+  <span className="text-xs font-medium italic text-subText">
+    <Trans>
+      <span className="text-text">Notice</span>: Some of your {symbol} is already reserved by an open Limit Order -
+      review it <Link to={to}>here</Link>.
+    </Trans>
+  </span>
+)
 
 function ExecutionPrice({
   executionPrice,
@@ -78,7 +86,7 @@ const PriceUpdateWarning = ({
 }) => (
   <div
     className={cn(
-      'mt-4 flex items-center gap-2 rounded-2xl px-3 py-2 text-xs',
+      'flex items-center gap-2 rounded-2xl px-3 py-2 text-xs',
       isAccepted
         ? 'bg-subText/20 text-subText'
         : level === 'warning'
@@ -123,7 +131,7 @@ export default function ConfirmSwapModalContent({
   const shouldDisableConfirmButton = isBuildingRoute || !!errorWhileBuildRoute
 
   const { currency: currencyParam } = useParams()
-  const { currencyIn } = useCurrenciesByPage()
+  const { currencyIn, currencyOut } = useCurrenciesByPage()
   const { chainId, account, networkInfo } = useActiveWeb3React()
   const [honeypot, setHoneypot] = useState<{ isHoneypot: boolean; isFOT: boolean; tax: number } | null>(null)
   useEffect(() => {
@@ -325,43 +333,26 @@ export default function ConfirmSwapModalContent({
 
   const [searchParams, setSearchParams] = useSearchParams()
   const { data: loActiveMakingAmount } = useGetTotalActiveMakingAmountQuery(
-    { chainId, tokenAddress: currencyIn?.wrapped.address ?? '', account: account ?? '' },
-    { skip: !currencyIn || !account || currencyIn.isNative },
-  )
-  const { data: { orders = [] } = {} } = useGetListOrdersQuery(
     {
       chainId,
-      maker: account,
-      status: LimitOrderStatus.ACTIVE,
-      query: currencyIn?.wrapped.address,
-      page: 1,
-      pageSize: 20,
+      makerAsset: currencyIn?.wrapped.address,
+      takerAsset: currencyOut?.wrapped.address,
+      account,
     },
-    { skip: !account || currencyIn?.isNative, refetchOnFocus: true },
+    { skip: !currencyIn || !currencyOut || !account || currencyIn.isNative },
   )
-
-  const ignoredOrders = useMemo(() => {
-    return orders.filter(order => {
-      const filledPercent = calcPercentFilledOrder(
-        order.filledTakingAmount,
-        order.takingAmount,
-        order.takerAssetDecimals,
-      )
-      return filledPercent === '99.99'
-    })
-  }, [orders])
-
-  const activeMakingAmount =
-    BigInt(loActiveMakingAmount || 0) -
-    ignoredOrders.reduce((acc, order) => {
-      return acc + BigInt(order.makingAmount) - BigInt(order.filledMakingAmount)
-    }, 0n)
+  const activeMakingAmount = BigInt(loActiveMakingAmount || 0)
 
   const balance = useTokenBalance(currencyIn?.wrapped)
 
   const remainAmount = BigInt(balance?.quotient.toString() || 0) - BigInt(buildResult?.data?.amountIn || 0)
 
   const showLOWwarning = currencyIn?.isNative ? false : !!loActiveMakingAmount && remainAmount < activeMakingAmount
+  const limitOrderSearch = new URLSearchParams({
+    tab: LimitOrderTab.MY_ORDER,
+    orderTab: LimitOrderStatus.ACTIVE,
+    search: `${currencyIn?.wrapped.symbol}/${currencyOut?.wrapped.symbol}`,
+  })
 
   const [showInverted, setShowInverted] = useState<boolean>(false)
   const [retry, setRetry] = useState(0)
@@ -393,7 +384,7 @@ export default function ConfirmSwapModalContent({
         suggestionMessage={
           retry < 1 &&
           slippage !== dynamicSuggestedSlippage && (
-            <div className="mt-2 text-base text-text">
+            <div className="text-base text-text">
               <Trans>New Suggested Slippage:</Trans> {(dynamicSuggestedSlippage * 100) / 10_000}%{' '}
               <InfoHelper
                 text={
@@ -421,30 +412,20 @@ export default function ConfirmSwapModalContent({
         formattedOutputChangePercent={formattedOutputChangePercent}
       />
 
-      <div className="flex w-full flex-col gap-4 rounded-[20px] p-6">
-        <AutoColumn>
-          <RowBetween>
-            <span className="text-xl font-medium">
-              <Trans>Confirm Swap Details</Trans>
-            </span>
-            <CloseIcon onClick={onDismiss} />
-          </RowBetween>
+      <Stack className="w-full gap-4 p-5">
+        <Stack className="gap-3">
+          <Stack className="gap-1">
+            <HStack className="w-full items-center justify-between">
+              <span className="text-xl font-medium">
+                <Trans>Confirm Swap Details</Trans>
+              </span>
+              <CloseIcon onClick={onDismiss} />
+            </HStack>
 
-          <RowBetween className="mt-1">
-            <span className="text-xs font-normal text-subText">
+            <div className="text-xs text-subText">
               <Trans>Please review the details of your swap:</Trans>
-            </span>
-            {isBuildingRoute && (
-              <div className="flex h-full w-fit items-center gap-1">
-                <Loader size="14px" className="text-primary" />
-                <span className="text-xs text-subText">
-                  <Dots>
-                    <Trans>Checking price</Trans>
-                  </Dots>
-                </span>
-              </div>
-            )}
-          </RowBetween>
+            </div>
+          </Stack>
 
           {outputChangePercent < 0 && (
             <PriceUpdateWarning
@@ -468,33 +449,51 @@ export default function ConfirmSwapModalContent({
             </PriceUpdateWarning>
           )}
 
-          <div className="mt-3 flex items-center gap-1">
-            <span className="min-w-max text-xs font-normal text-subText">
-              <Trans>Rate:</Trans>
-            </span>
-            <ValueWithLoadingSkeleton
-              skeletonStyle={{
-                width: '160px',
-                height: '19px',
-              }}
-              isShowingSkeleton={isBuildingRoute}
-              content={
-                getSwapDetailsProps().executionPrice ? (
-                  <div className="flex items-center justify-center text-right text-xs font-medium text-text">
-                    <ExecutionPrice executionPrice={getSwapDetailsProps().executionPrice} showInverted={showInverted} />
-                    <StyledBalanceMaxMini onClick={() => setShowInverted(!showInverted)}>
-                      <Repeat size={14} className="text-text" />
-                    </StyledBalanceMaxMini>
-                  </div>
-                ) : (
-                  <p className="m-0 text-[12px] font-medium text-text">--</p>
-                )
-              }
-            />
-          </div>
+          <Stack className="gap-1">
+            <HStack className="items-center justify-between gap-4">
+              <div className="flex min-h-6 items-center gap-1">
+                <span className="min-w-max text-xs font-normal text-subText">
+                  <Trans>Rate:</Trans>
+                </span>
+                <ValueWithLoadingSkeleton
+                  skeletonStyle={{ width: '160px' }}
+                  isShowingSkeleton={isBuildingRoute}
+                  content={
+                    getSwapDetailsProps().executionPrice ? (
+                      <div className="flex items-center justify-center text-right text-xs font-medium text-text">
+                        <ExecutionPrice
+                          executionPrice={getSwapDetailsProps().executionPrice}
+                          showInverted={showInverted}
+                        />
+                        <StyledBalanceMaxMini
+                          className="hover:brightness-[0.85]"
+                          onClick={() => setShowInverted(!showInverted)}
+                        >
+                          <Repeat size={14} className="text-text" />
+                        </StyledBalanceMaxMini>
+                      </div>
+                    ) : (
+                      <p className="m-0 text-[12px] font-medium text-text">--</p>
+                    )
+                  }
+                />
+              </div>
 
-          {renderSwapBrief()}
-        </AutoColumn>
+              {isBuildingRoute && (
+                <div className="flex h-full w-fit items-center gap-1">
+                  <Loader size="14px" className="text-primary" />
+                  <span className="text-xs text-subText">
+                    <Dots>
+                      <Trans>Checking price</Trans>
+                    </Dots>
+                  </span>
+                </div>
+              )}
+            </HStack>
+
+            {renderSwapBrief()}
+          </Stack>
+        </Stack>
 
         <SwapDetails {...getSwapDetailsProps()} />
 
@@ -505,15 +504,10 @@ export default function ConfirmSwapModalContent({
 
           {errorWhileBuildRoute && <WarningNote shortText={errorText} />}
           {showLOWwarning && (
-            <span className="text-xs font-medium italic text-subText">
-              <span className="font-medium text-text">Notice</span>: Some of your {currencyIn?.symbol} is already
-              reserved by an open Limit Order—review it{' '}
-              <Link
-                to={`${APP_PATHS.LIMIT}/${networkInfo.route}/${currencyParam}?activeTab=${LimitOrderTab.MY_ORDER}&search=${currencyIn?.wrapped.address}&highlight=true`}
-              >
-                here.
-              </Link>
-            </span>
+            <ReservedOrderNotice
+              symbol={currencyIn?.symbol}
+              to={`${APP_PATHS.LIMIT}/${networkInfo.route}/${currencyParam}?${limitOrderSearch}`}
+            />
           )}
 
           {errorWhileBuildRoute ? (
@@ -614,7 +608,7 @@ export default function ConfirmSwapModalContent({
             </div>
           )}
         </div>
-      </div>
+      </Stack>
     </>
   )
 }

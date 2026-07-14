@@ -3,6 +3,7 @@ import { useMemo } from 'react'
 
 import { NETWORKS_INFO } from 'constants/networks'
 import { useActiveWeb3React, useWeb3React } from 'hooks'
+import { restrictedTokenMessage, useIsTokenAddressRestricted } from 'hooks/useRestrictedTokens'
 import { useChangeNetwork } from 'hooks/web3/useChangeNetwork'
 import { ApprovalState } from 'pages/Earns/PoolDetail/AddLiquidity/hooks/useApproval'
 import { ZapState } from 'pages/Earns/PoolDetail/AddLiquidity/hooks/useZapState'
@@ -69,11 +70,19 @@ export const useZapActions = ({
 
   const isApprovalLoading = approval.tokenApproval.loading || tokenApprovalPending
 
+  const isAddressRestricted = useIsTokenAddressRestricted()
+  const restrictedToken = useMemo(
+    () => state.tokenInput.tokens.find(token => isAddressRestricted(poolChainId, token.address)),
+    [isAddressRestricted, poolChainId, state.tokenInput.tokens],
+  )
+
   const primaryActionText = useMemo(() => {
     if (!account) return 'Connect Wallet'
     if (walletChainId !== poolChainId) {
       return `Switch to ${NETWORKS_INFO[poolChainId as keyof typeof NETWORKS_INFO]?.name || poolChainId}`
     }
+
+    if (restrictedToken) return restrictedTokenMessage(restrictedToken.symbol)
 
     if (tokenApprovalPending) return 'Approving'
     if (previewLoading) return 'Building'
@@ -95,6 +104,7 @@ export const useZapActions = ({
     nextTokenToApprove,
     poolChainId,
     previewLoading,
+    restrictedToken,
     route,
     routeError,
     routeLoading,
@@ -104,11 +114,11 @@ export const useZapActions = ({
   ])
 
   const primaryActionVariant = !nextTokenToApprove && (isZapImpactBlocked || isHighZapImpact) ? 'error' : 'primary'
-  const showRouteLoadingDots = routeLoading && Boolean(route)
   const isPrimaryActionDisabled =
     !!account &&
     walletChainId === poolChainId &&
-    (Boolean(validationError) ||
+    (Boolean(restrictedToken) ||
+      Boolean(validationError) ||
       isApprovalLoading ||
       previewLoading ||
       (routeLoading && !route) ||
@@ -120,6 +130,8 @@ export const useZapActions = ({
       toggleWalletModal()
       return
     }
+
+    if (restrictedToken) return
 
     if (!hasPositiveInput || validationError || !route || routeError) return
 
@@ -153,7 +165,6 @@ export const useZapActions = ({
   return {
     primaryActionText,
     primaryActionVariant,
-    showRouteLoadingDots,
     isPrimaryActionDisabled,
     handlePrimaryAction,
   }

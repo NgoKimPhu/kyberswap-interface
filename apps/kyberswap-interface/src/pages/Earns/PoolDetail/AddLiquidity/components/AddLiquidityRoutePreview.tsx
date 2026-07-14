@@ -3,8 +3,8 @@ import { Fragment } from 'react'
 
 import { ReactComponent as KyberLogo } from 'assets/svg/kyber/kyber_logo.svg'
 import Skeleton from 'components/Skeleton'
+import { TextHelper } from 'components/Text'
 import TokenLogo from 'components/TokenLogo'
-import TooltipText from 'pages/Earns/PoolDetail/AddLiquidity/components/TooltipText'
 import {
   formatBpsLabel,
   formatPercent,
@@ -12,6 +12,7 @@ import {
   getOutputTokenItems,
   getZapFeePercent,
 } from 'pages/Earns/PoolDetail/AddLiquidity/utils'
+import { ExternalLink } from 'theme'
 import { formatDisplayNumber } from 'utils/numbers'
 
 type RouteTokenItem = {
@@ -29,11 +30,7 @@ type AddLiquidityRoutePreviewProps = {
 
 const PreviewAssetItems = ({ items }: { items: RouteTokenItem[] }) => {
   if (!items.length) {
-    return (
-      <div className="h-[17px]">
-        <Skeleton width={160} height={17} />
-      </div>
-    )
+    return <Skeleton width={160} height={20} />
   }
 
   return (
@@ -99,26 +96,23 @@ const AddLiquidityRoutePreview = ({
 
           <div className="flex flex-col gap-2 px-3 py-2">
             <div className="flex items-center justify-between gap-4">
-              <TooltipText
+              <TextHelper
                 tooltip={
-                  <div className="flex flex-col items-start gap-1 [&_a]:text-primary [&_a]:no-underline">
+                  <span>
                     Fees charged for automatically zapping into a liquidity pool. You still have to pay the standard gas
-                    fees.
-                    <a href={API_URLS.DOCUMENT.ZAP_FEE_MODEL} target="_blank" rel="noopener norefferer noreferrer">
-                      {'>'} More details
-                    </a>
-                  </div>
+                    fees. <ExternalLink href={API_URLS.DOCUMENT.ZAP_FEE_MODEL}>More details ↗</ExternalLink>
+                  </span>
                 }
                 placement="left"
                 color="var(--ks-subText)"
                 fontSize={14}
               >
                 Fee
-              </TooltipText>
+              </TextHelper>
               <span className="text-sm font-medium text-text2">{formatPercent(zapFeePercent)}</span>
             </div>
             <div className="flex items-center justify-between gap-4">
-              <TooltipText
+              <TextHelper
                 tooltip={
                   'Applied to each zap step. Setting a high slippage tolerance can help transactions succeed, but you may not get such a good price. Please use with caution!'
                 }
@@ -127,7 +121,7 @@ const AddLiquidityRoutePreview = ({
                 fontSize={14}
               >
                 Max Slippage
-              </TooltipText>
+              </TextHelper>
               <span className="text-sm font-medium text-text2">{formatBpsLabel(slippage)}</span>
             </div>
           </div>

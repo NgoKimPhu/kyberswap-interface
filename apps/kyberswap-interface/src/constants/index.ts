@@ -7,6 +7,8 @@ import { TransactionFlowState } from 'types/TransactionFlowState'
 import { MAINNET_NETWORKS, NETWORKS_INFO, SUPPORTED_NETWORKS } from './networks'
 
 export const KYBERSWAP_DOMAIN = 'kyberswap.com'
+/** Canonical production base URL (no trailing slash). Use this instead of hardcoding the domain. */
+export const KYBERSWAP_URL = `https://${KYBERSWAP_DOMAIN}`
 
 export const EMPTY_OBJECT: any = {}
 export const EMPTY_ARRAY: any[] = []
@@ -123,6 +125,9 @@ export const APP_PATHS = {
   FIND_POOL: '/find',
   POOLS: '/pools',
   ADD_LIQUIDITY: '/pools/add-liquidity',
+  // Path-based pool-detail: /pools/<chain-slug>/<protocol>/<address>. The ADD_LIQUIDITY
+  // query-param form 301-redirects here. Build via getPoolDetailUrl (Earns/utils/url).
+  POOL_DETAIL: '/pools/:chain/:protocol/:address',
   CLASSIC_CREATE_POOL: '/create',
   CLASSIC_ADD_LIQ: '/add',
   CLASSIC_REMOVE_POOL: '/remove',
@@ -212,8 +217,10 @@ export const RTK_QUERY_TAGS = {
   GET_BRIDGE_HISTORY: 'GET_BRIDGE_HISTORY',
 
   // limit order
-  GET_LIST_ORDERS: 'GET_LIST_ORDERS',
-  GET_ORDERS_BY_TOKEN_PAIR: 'GET_ORDERS_BY_TOKEN_PAIR',
+  GET_LIMIT_ORDER_LIST: 'GET_LIMIT_ORDER_LIST',
+  GET_LIMIT_ORDER_BOOK: 'GET_LIMIT_ORDER_BOOK',
+  GET_LIMIT_ORDER_INSUFFICIENT: 'GET_LIMIT_ORDER_INSUFFICIENT',
+  GET_LIMIT_ORDER_ACTIVE_MAKING_AMOUNT: 'GET_LIMIT_ORDER_ACTIVE_MAKING_AMOUNT',
 
   // smart exit
   GET_SMART_EXIT_ORDERS: 'GET_SMART_EXIT_ORDERS',
@@ -295,10 +302,6 @@ export const ICON_IDS = [
 ] as const
 export type ICON_ID = (typeof ICON_IDS)[number]
 
-export const ClientNameMapping: { [key: string]: string } = {
-  dexscreener: 'DEX Screener',
-}
-
 export const SAFE_APP_FEE_RECEIVER_ADDRESS = '0x55602F3057be52BFB6F98fFE799CFDec58Af5130'
 export const SAFE_APP_CLIENT_ID = 'app.safe.global'
 
@@ -308,6 +311,3 @@ export const CROSS_CHAIN_FEE_RECEIVER_SUI = 'intentionally-empty-for-now'
 // use a fake address in case user wallet is not connected. will reject if sign tx with this address
 export const BTC_DEFAULT_RECEIVER = 'bc1qmzgkj3hznt8heh4vp33v2cr2mvsyhc3lmfzz9p'
 export const SOLANA_NATIVE = '11111111111111111111111111111111'
-
-export const BUNGEE_AFFILIATE_ID =
-  '609913096e183f62cecd07e9c13f82e04ffbbdceb5fef75aad43e6cbff367039708902197e0b2b78b1d76cb0837ad0b318baedceb5fef75aad43e6cb'

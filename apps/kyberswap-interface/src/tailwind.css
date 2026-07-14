@@ -15,35 +15,6 @@
   @apply disabled:!cursor-not-allowed disabled:!bg-buttonGray disabled:!text-border;
 }
 
-@keyframes ks-loading-dots {
-  0% {
-    content: '.';
-  }
-  33% {
-    content: '..';
-  }
-  66%,
-  100% {
-    content: '...';
-  }
-}
-
-.ks-loading-dots {
-  position: relative;
-  display: inline-block;
-}
-
-.ks-loading-dots::after {
-  content: '.';
-  position: absolute;
-  left: 100%;
-  top: 50%;
-  width: 1rem;
-  transform: translateY(-50%);
-  text-align: left;
-  animation: ks-loading-dots 1.2s steps(1, end) infinite;
-}
-
 @layer components {
   /* Native browser checkbox tinted with theme primary; pseudo-elements handle the indeterminate state. */
   .ks-checkbox-native {
@@ -189,6 +160,21 @@
     align-items: center;
     justify-content: center;
     background-color: var(--ks-bgModal);
+    /* Entrance fade in CSS (not framer-motion, which is unreliable on the wrapped overlay under React
+       19). Opacity is multiplicative, so fading the overlay fades the content too. */
+    animation: ks-dialog-fade-in 0.2s ease;
+  }
+  /* transition={false} opts out of the fade. */
+  .ks-dialog-overlay[data-reach-dialog-overlay][data-no-transition='true'] {
+    animation: none;
+  }
+  @keyframes ks-dialog-fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
   }
 
   /* <Modal> content. Dynamic width/height/maxWidth/etc. are applied via inline style;
@@ -199,6 +185,7 @@
     overflow-y: scroll;
     overflow-x: hidden;
     display: flex;
+    flex-direction: column;
     align-self: center;
     margin: 0 0 2rem 0;
   }
@@ -221,7 +208,9 @@
     }
   }
   @media (max-width: 768px) {
-    .ks-dialog-content[data-reach-dialog-content]:not([data-has-explicit-width='true']):not([data-mobile-full-width='true']) {
+    .ks-dialog-content[data-reach-dialog-content]:not([data-has-explicit-width='true']):not(
+        [data-mobile-full-width='true']
+      ) {
       width: 85vw;
     }
     .ks-dialog-content[data-reach-dialog-content][data-mobile='true']:not([data-has-explicit-width='true']) {
@@ -429,13 +418,42 @@
     color: var(--ks-primary);
     font-weight: bold;
   }
-  .ks-date-picker .custom-calendar .react-calendar__decade-view button,
-  .ks-date-picker .custom-calendar .react-calendar__century-view button,
-  .ks-date-picker .custom-calendar .react-calendar__year-view button {
-    padding: 14px 0.5em;
+  .ks-date-picker .custom-calendar .react-calendar__decade-view button:not(:disabled):hover,
+  .ks-date-picker .custom-calendar .react-calendar__century-view button:not(:disabled):hover,
+  .ks-date-picker .custom-calendar .react-calendar__year-view button:not(:disabled):hover {
+    background-color: var(--ks-buttonGray);
+  }
+  .ks-date-picker
+    .custom-calendar
+    :is(
+      .react-calendar__year-view__months,
+      .react-calendar__decade-view__years,
+      .react-calendar__century-view__decades
+    ) {
+    gap: 4px;
+  }
+  .ks-date-picker
+    .custom-calendar
+    :is(.react-calendar__decade-view, .react-calendar__century-view, .react-calendar__year-view)
+    button {
+    border-radius: 8px;
+    padding: 10px 0.5em;
+    font-weight: bold;
+  }
+  .ks-date-picker .custom-calendar .react-calendar__year-view__months__month {
+    flex-basis: calc((100% - 8px) / 3) !important;
+    max-width: calc((100% - 8px) / 3);
+  }
+  .ks-date-picker
+    .custom-calendar
+    :is(.react-calendar__decade-view__years__year, .react-calendar__century-view__decades__decade) {
+    flex-basis: calc((100% - 16px) / 3) !important;
+    max-width: calc((100% - 16px) / 3);
   }
   .ks-date-picker .custom-calendar .react-calendar__navigation {
-    margin: 0;
+    display: flex;
+    gap: 2px;
+    margin-bottom: 8px;
     font-weight: 500;
     height: auto;
   }
@@ -444,9 +462,12 @@
     font-size: 14px;
     color: var(--ks-text);
     background-color: transparent;
+    margin-inline: 8px;
+    border-radius: 8px;
   }
-  .ks-date-picker .custom-calendar .react-calendar__navigation__label:hover {
-    background-color: transparent;
+  .ks-date-picker .custom-calendar .react-calendar__navigation__label:enabled:hover,
+  .ks-date-picker .custom-calendar .react-calendar__navigation__label:enabled:focus {
+    background-color: var(--ks-buttonBlack);
   }
   .ks-date-picker .custom-calendar .react-calendar__navigation__arrow {
     font-size: 20px;
@@ -459,8 +480,15 @@
     line-height: 1;
     min-width: unset;
   }
+  .ks-date-picker .custom-calendar .react-calendar__navigation__arrow:enabled:hover,
+  .ks-date-picker .custom-calendar .react-calendar__navigation__arrow:enabled:focus {
+    background-color: var(--ks-buttonBlack);
+  }
   .ks-date-picker .custom-calendar .react-calendar__navigation__arrow:disabled {
     background-color: rgba(28, 28, 28, 0.4);
+  }
+  .ks-date-picker .custom-calendar .react-calendar__viewContainer {
+    min-height: 232px;
   }
   .ks-date-picker .custom-calendar .react-calendar__month-view__days button {
     height: 34px;
@@ -489,6 +517,7 @@
     .react-calendar__month-view__days
     button.react-calendar__month-view__days__day--neighboringMonth {
     font-style: italic;
+    color: var(--ks-subText);
   }
   @media (max-width: 992px) {
     .ks-date-picker .custom-date-picker .custom-calendar .react-calendar__month-view__days button {
@@ -612,10 +641,7 @@
   }
   .ks-slider::-webkit-slider-thumb:hover,
   .ks-slider::-webkit-slider-thumb:focus {
-    box-shadow:
-      0 0 1px rgba(0, 0, 0, 0.1),
-      0 4px 8px rgba(0, 0, 0, 0.08),
-      0 16px 24px rgba(0, 0, 0, 0.06),
+    box-shadow: 0 0 1px rgba(0, 0, 0, 0.1), 0 4px 8px rgba(0, 0, 0, 0.08), 0 16px 24px rgba(0, 0, 0, 0.06),
       0 24px 32px rgba(0, 0, 0, 0.04);
   }
   .ks-slider::-moz-range-thumb {
@@ -628,10 +654,7 @@
   }
   .ks-slider::-moz-range-thumb:hover,
   .ks-slider::-moz-range-thumb:focus {
-    box-shadow:
-      0 0 1px rgba(0, 0, 0, 0.1),
-      0 4px 8px rgba(0, 0, 0, 0.08),
-      0 16px 24px rgba(0, 0, 0, 0.06),
+    box-shadow: 0 0 1px rgba(0, 0, 0, 0.1), 0 4px 8px rgba(0, 0, 0, 0.08), 0 16px 24px rgba(0, 0, 0, 0.06),
       0 24px 32px rgba(0, 0, 0, 0.04);
   }
   .ks-slider::-ms-thumb {
@@ -643,10 +666,7 @@
   }
   .ks-slider::-ms-thumb:hover,
   .ks-slider::-ms-thumb:focus {
-    box-shadow:
-      0 0 1px rgba(0, 0, 0, 0.1),
-      0 4px 8px rgba(0, 0, 0, 0.08),
-      0 16px 24px rgba(0, 0, 0, 0.06),
+    box-shadow: 0 0 1px rgba(0, 0, 0, 0.1), 0 4px 8px rgba(0, 0, 0, 0.08), 0 16px 24px rgba(0, 0, 0, 0.06),
       0 24px 32px rgba(0, 0, 0, 0.04);
   }
   .ks-slider::-webkit-slider-runnable-track {
@@ -694,27 +714,53 @@
 
   /* PositionDetail enter animations (rendered with arbitrary `animate-[ks-pd-*]` values). */
   @keyframes ks-pd-fade-in {
-    from { opacity: 0; transform: translateY(4px); }
-    to   { opacity: 1; transform: translateY(0); }
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
   @keyframes ks-pd-slide-down {
-    from { opacity: 0; transform: translateY(-8px); }
-    to   { opacity: 1; transform: translateY(0); }
+    from {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 
   /* TopBanner marquee — slide distance set via --ks-marquee-shift on the consumer. */
   @keyframes ks-top-banner-marquee {
-    from { transform: translateX(0); }
-    to   { transform: translateX(calc(-1 * var(--ks-marquee-shift, 0px))); }
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(calc(-1 * var(--ks-marquee-shift, 0px)));
+    }
   }
 
   /* Used by <Dots> — animates an ellipsis after some text (e.g. "Loading..."). */
   .animate-ellipsis::after {
     display: inline-block;
-    animation: ellipsis 1.25s infinite;
+    animation: ellipsis 1.25s steps(1, end) infinite;
     content: '.';
     width: 1em;
     text-align: left;
+  }
+  .animate-ellipsis-absolute {
+    position: relative;
+    display: inline-block;
+  }
+  .animate-ellipsis-absolute::after {
+    position: absolute;
+    left: 100%;
+    top: 50%;
+    transform: translateY(-50%);
   }
   @keyframes ellipsis {
     0% {
@@ -723,7 +769,8 @@
     33% {
       content: '..';
     }
-    66% {
+    66%,
+    100% {
       content: '...';
     }
   }
@@ -731,10 +778,10 @@
   /* Menu scroll-hint chevron bounce. */
   @keyframes floating {
     from {
-      bottom: 10px;
+      bottom: 0.25rem;
     }
     to {
-      bottom: -10px;
+      bottom: -0.25rem;
     }
   }
 
@@ -800,19 +847,6 @@
     100% {
       box-shadow: 0 0 0 2px rgb(var(--ks-primary-rgb) / 0);
       opacity: 0.25;
-    }
-  }
-
-  /* LimitOrder ListOrder — primary box-shadow pulse on highlighted row. */
-  @keyframes ks-order-highlight {
-    0% {
-      box-shadow: 0 0 0 0 var(--ks-primary);
-    }
-    70% {
-      box-shadow: 0 0 0 2px var(--ks-primary);
-    }
-    100% {
-      box-shadow: 0 0 0 0 var(--ks-primary);
     }
   }
 
@@ -991,23 +1025,13 @@
   .ks-transactions-tab[data-scrollable='true'][data-scroll-left='true']::before {
     left: 0;
     transform: translateX(-1px);
-    background: linear-gradient(
-      -90deg,
-      rgba(0, 0, 0, 0) 0%,
-      var(--ks-background) 90%,
-      var(--ks-background) 100%
-    );
+    background: linear-gradient(-90deg, rgba(0, 0, 0, 0) 0%, var(--ks-background) 90%, var(--ks-background) 100%);
   }
   .ks-transactions-tab[data-scrollable='true'][data-scroll-right='true']::after {
     right: 0;
     transform: translateX(1px);
     justify-content: flex-end;
-    background: linear-gradient(
-      90deg,
-      rgba(0, 0, 0, 0) 0%,
-      var(--ks-background) 90%,
-      var(--ks-background) 100%
-    );
+    background: linear-gradient(90deg, rgba(0, 0, 0, 0) 0%, var(--ks-background) 90%, var(--ks-background) 100%);
   }
 }
 
@@ -1289,6 +1313,7 @@
     --ks-bg6-rgb: 29 122 95;
     --ks-primary-rgb: 49 203 158;
     --ks-border-rgb: 80 80 80;
+    --ks-border-primary: 48 144 116;
     --ks-red-rgb: 255 83 123;
     --ks-warning-rgb: 255 153 1;
     --ks-apr-rgb: 15 170 162;

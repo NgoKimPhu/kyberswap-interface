@@ -1,9 +1,11 @@
-import { useFormo } from '@formo/analytics'
 import { Currency, CurrencyAmount } from '@kyberswap/ks-sdk-core'
 import mixpanel, { crossChainMixpanel } from 'libs/mixpanel'
 import { useCallback, useEffect } from 'react'
 import { usePrevious } from 'react-use'
 
+// `useFormo` comes from the local Formo context so the heavy `@formo/analytics` SDK stays out of this
+// eager module's chunk and is only loaded by the deferred provider.
+import { useFormo } from 'components/Analytics/formoContext'
 import { NETWORKS_INFO } from 'constants/networks'
 import { useActiveWeb3React } from 'hooks'
 import { sanitizeFormoPayload } from 'hooks/sanitizeFormoPayload'
@@ -133,7 +135,7 @@ export enum TRACKING_EVENT_TYPE {
   BRIDGE_CLICK_DISCLAIMER,
   BRIDGE_CLICK_UNDERSTAND_IN_FIRST_TIME_VISIT,
 
-  //Kyber DAO
+  // Kyber DAO
   KYBER_DAO_STAKE_CLICK,
   KYBER_DAO_UNSTAKE_CLICK,
   KYBER_DAO_DELEGATE_CLICK,
@@ -157,18 +159,15 @@ export enum TRACKING_EVENT_TYPE {
   ANNOUNCEMENT_CLICK_CTA_POPUP,
   ANNOUNCEMENT_CLICK_CLEAR_ALL_INBOXES,
 
-  // limit order
+  // Limit Order
+  LO_PAGE_VIEWED,
   LO_CLICK_PLACE_ORDER,
   LO_PLACE_ORDER_SUCCESS,
   LO_ENTER_DETAIL,
   LO_CLICK_CANCEL_ORDER,
   LO_CANCEL_ORDER_SUBMITTED,
   LO_CLICK_REVIEW_PLACE_ORDER,
-  LO_CLICK_EDIT_ORDER,
-  LO_DISPLAY_SETTING_CLICK,
-  LO_CLICK_SUBSCRIBE_BTN,
   LO_CLICK_CANCEL_TYPE,
-  LO_CLICK_UPDATE_TYPE,
   LO_CLICK_GET_STARTED,
   LO_CLICK_WARNING_IN_SWAP,
   LO_REVIEW_OPENED,
@@ -179,6 +178,18 @@ export enum TRACKING_EVENT_TYPE {
   LO_SIDE_SELECTED,
   LO_PRICE_SET,
   LO_EXPIRY_CHANGED,
+  LO2_CLICK_TAKE,
+  LO2_CLICK_PAIR_INVERT,
+  LO2_CLICK_HALF,
+  LO2_CLICK_MAX,
+  LO2_CLICK_WALLET_MAX,
+  LO2_CLICK_USE_SWAP,
+  LO2_CLICK_FILL,
+  LO2_CLICK_RETRY,
+  LO2_CLOSE_PANEL,
+  LO2_CLICK_RATE_PRESET,
+  LO2_CLICK_MARKET_RATE,
+  LO2_CLICK_SHARED_BALANCE_REVIEW,
 
   // Wallet UI
   WUI_WALLET_CLICK,
@@ -332,6 +343,10 @@ export enum TRACKING_EVENT_TYPE {
   MENU_LINK_CLICKED,
   NOTIFICATION_CENTER_OPENED,
   LANGUAGE_CHANGED,
+
+  // Tip Link Generator
+  TIP_LINK_GENERATE_LINK_CLICK,
+  TIP_LINK_TRADE,
 }
 
 export const NEED_CHECK_SUBGRAPH_TRANSACTION_TYPES: readonly TRANSACTION_TYPE[] = [
@@ -412,6 +427,16 @@ export default function useTracking(currencies?: { [field in Field]?: Currency }
         }
         case TRACKING_EVENT_TYPE.WALLET_CONNECT_WALLET_CLICK: {
           formoTrack('Wallet Connect - Wallet click', payload)
+          break
+        }
+        case TRACKING_EVENT_TYPE.TIP_LINK_GENERATE_LINK_CLICK: {
+          formoTrack('Tip Link - Generate Link Click', payload)
+          break
+        }
+        // Tip-link attributed trade (swap / limit order / cross-chain). The trade type is
+        // carried in `payload.trade_type` so all three flows roll up into one event.
+        case TRACKING_EVENT_TYPE.TIP_LINK_TRADE: {
+          formoTrack('Tip Link Trade', payload)
           break
         }
       }
@@ -681,11 +706,11 @@ export default function useTracking(currencies?: { [field in Field]?: Currency }
           break
         }
         case TRACKING_EVENT_TYPE.MEV_ADD_CLICK_MODAL: {
-          formoTrack('MEV Protection -  MEV protection type click', payload)
+          formoTrack('MEV Protection - MEV protection type click', payload)
           break
         }
         case TRACKING_EVENT_TYPE.MEV_ADD_RESULT: {
-          formoTrack('MEV Protection -  Add MEV protection result', payload)
+          formoTrack('MEV Protection - Add MEV protection result', payload)
           break
         }
         case TRACKING_EVENT_TYPE.CREATE_POOL_INITITATED: {
@@ -1039,7 +1064,7 @@ export default function useTracking(currencies?: { [field in Field]?: Currency }
         }
         case TRACKING_EVENT_TYPE.BRIDGE_TRANSACTION_SUBMIT: {
           const { tx_hash, from_token, to_token, bridge_fee, from_network, to_network, trade_qty } = payload
-          formoTrack('Bridge -  Transaction Submitted', {
+          formoTrack('Bridge - Transaction Submitted', {
             tx_hash,
             from_token,
             to_token,
@@ -1148,12 +1173,16 @@ export default function useTracking(currencies?: { [field in Field]?: Currency }
           formoTrack('Gas refund - KNC Utility source click', { source })
           break
         }
+        case TRACKING_EVENT_TYPE.LO_PAGE_VIEWED: {
+          formoTrack('Limit Order Page Viewed')
+          break
+        }
         case TRACKING_EVENT_TYPE.LO_CLICK_PLACE_ORDER: {
-          formoTrack('Limit Order -  Place Order Click', payload)
+          formoTrack('Limit Order - Place Order Click', payload)
           break
         }
         case TRACKING_EVENT_TYPE.LO_PLACE_ORDER_SUCCESS: {
-          formoTrack('Limit Order -  Place Order Submit Success', payload)
+          formoTrack('Limit Order - Place Order Submit Success', payload)
           break
         }
         case TRACKING_EVENT_TYPE.LO_ENTER_DETAIL: {
@@ -1161,40 +1190,24 @@ export default function useTracking(currencies?: { [field in Field]?: Currency }
           break
         }
         case TRACKING_EVENT_TYPE.LO_CLICK_CANCEL_ORDER: {
-          formoTrack('Limit Order -  Cancel Order Click', payload)
+          formoTrack('Limit Order - Cancel Order Click', payload)
           break
         }
 
         case TRACKING_EVENT_TYPE.LO_CANCEL_ORDER_SUBMITTED: {
-          formoTrack('Limit Order -  Cancel Order Submit Success', payload)
+          formoTrack('Limit Order - Cancel Order Submit Success', payload)
           break
         }
         case TRACKING_EVENT_TYPE.LO_CLICK_REVIEW_PLACE_ORDER: {
-          formoTrack('Limit Order -  Review Order Click', payload)
-          break
-        }
-        case TRACKING_EVENT_TYPE.LO_CLICK_EDIT_ORDER: {
-          formoTrack('Limit Order -  Update Order Click', payload)
-          break
-        }
-        case TRACKING_EVENT_TYPE.LO_DISPLAY_SETTING_CLICK: {
-          formoTrack('Limit Order - Display settings on Limit settings', payload)
-          break
-        }
-        case TRACKING_EVENT_TYPE.LO_CLICK_SUBSCRIBE_BTN: {
-          formoTrack('Limit Order - User click to Subscribe button')
+          formoTrack('Limit Order - Review Order Click', payload)
           break
         }
         case TRACKING_EVENT_TYPE.LO_CLICK_CANCEL_TYPE: {
           formoTrack('Limit Order - Cancel Order Double Signature Click', payload)
           break
         }
-        case TRACKING_EVENT_TYPE.LO_CLICK_UPDATE_TYPE: {
-          formoTrack('Limit Order - Update Order Double Signature Click', payload)
-          break
-        }
         case TRACKING_EVENT_TYPE.LO_CLICK_GET_STARTED: {
-          formoTrack('Limit Order - Get Started Click', payload)
+          formoTrack('Limit Order - Get Started Click')
           break
         }
         case TRACKING_EVENT_TYPE.LO_CLICK_WARNING_IN_SWAP: {
@@ -1231,6 +1244,54 @@ export default function useTracking(currencies?: { [field in Field]?: Currency }
         }
         case TRACKING_EVENT_TYPE.LO_EXPIRY_CHANGED: {
           formoTrack('Limit Order Expiry Changed', payload)
+          break
+        }
+        case TRACKING_EVENT_TYPE.LO2_CLICK_TAKE: {
+          formoTrack('Limit Order 2.0 - Click Take', payload)
+          break
+        }
+        case TRACKING_EVENT_TYPE.LO2_CLICK_PAIR_INVERT: {
+          formoTrack('Limit Order 2.0 - Click Pair Invert', payload)
+          break
+        }
+        case TRACKING_EVENT_TYPE.LO2_CLICK_HALF: {
+          formoTrack('Limit Order 2.0 - Click Half', payload)
+          break
+        }
+        case TRACKING_EVENT_TYPE.LO2_CLICK_MAX: {
+          formoTrack('Limit Order 2.0 - Click Max', payload)
+          break
+        }
+        case TRACKING_EVENT_TYPE.LO2_CLICK_WALLET_MAX: {
+          formoTrack('Limit Order 2.0 - Click Wallet Max', payload)
+          break
+        }
+        case TRACKING_EVENT_TYPE.LO2_CLICK_USE_SWAP: {
+          formoTrack('Limit Order 2.0 - Click Use Swap', payload)
+          break
+        }
+        case TRACKING_EVENT_TYPE.LO2_CLICK_FILL: {
+          formoTrack('Limit Order 2.0 - Click Fill', payload)
+          break
+        }
+        case TRACKING_EVENT_TYPE.LO2_CLICK_RETRY: {
+          formoTrack('Limit Order 2.0 - Click Retry', payload)
+          break
+        }
+        case TRACKING_EVENT_TYPE.LO2_CLOSE_PANEL: {
+          formoTrack('Limit Order 2.0 - Close Panel', payload)
+          break
+        }
+        case TRACKING_EVENT_TYPE.LO2_CLICK_RATE_PRESET: {
+          formoTrack('Limit Order 2.0 - Click Rate Preset', payload)
+          break
+        }
+        case TRACKING_EVENT_TYPE.LO2_CLICK_MARKET_RATE: {
+          formoTrack('Limit Order 2.0 - Click Market Rate', payload)
+          break
+        }
+        case TRACKING_EVENT_TYPE.LO2_CLICK_SHARED_BALANCE_REVIEW: {
+          formoTrack('Limit Order 2.0 - Click Shared Balance Review', payload)
           break
         }
 
@@ -1782,7 +1843,7 @@ export default function useTracking(currencies?: { [field in Field]?: Currency }
     [currencies, account, mixpanel.hasOwnProperty('get_distinct_id'), formoTrack],
     /* eslint-enable */
   )
-  return { trackingHandler }
+  return { trackingHandler, isTrackingReady: !!analytics }
 }
 
 export const useGlobalTrackingEvents = () => {
@@ -1790,9 +1851,19 @@ export const useGlobalTrackingEvents = () => {
   const analytics = useFormo()
   const oldNetwork = usePrevious(chainId)
 
+  // Formo identify. `analytics` loads lazily on browser idle, so the effect depends on it to re-run once
+  // the SDK is ready. Kept separate from the mixpanel effect so a late Formo load doesn't reset the live
+  // mixpanel session.
+  useEffect(() => {
+    if (!analytics || !account || !isAddress(account, { strict: false })) return
+    analytics.identify({ address: account })
+    return () => {
+      analytics.reset()
+    }
+  }, [account, analytics])
+
   useEffect(() => {
     if (account && isAddress(account, { strict: false })) {
-      analytics?.identify({ address: account })
       crossChainMixpanel?.identify(account)
 
       const getQueryParam = (url: string, param: string) => {
@@ -1831,7 +1902,6 @@ export const useGlobalTrackingEvents = () => {
     }
     return () => {
       if (account) {
-        analytics?.reset()
         crossChainMixpanel?.reset()
       }
     }

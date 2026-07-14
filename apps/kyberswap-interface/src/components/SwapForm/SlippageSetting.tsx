@@ -6,7 +6,8 @@ import { useSearchParams } from 'react-router-dom'
 import SlippageControl from 'components/SlippageControl'
 import SlippageWarningNote from 'components/SlippageWarningNote'
 import { Stack } from 'components/Stack'
-import { MouseoverTooltip, TextDashed } from 'components/Tooltip'
+import { TextDashed } from 'components/Text'
+import { MouseoverTooltip } from 'components/Tooltip'
 import WarningNote from 'components/WarningNote'
 import { DEFAULT_SLIPPAGES, DEFAULT_SLIPPAGES_HIGH_VOTALITY } from 'constants/index'
 import { useDefaultSlippageByPair, usePairCategory } from 'state/swap/hooks'
@@ -25,7 +26,7 @@ export const DropdownIcon = ({
     {...rest}
     style={{ width: size || 12, height: size || 12, ...rest.style }}
     className={cn(
-      'relative z-0 ml-1 flex items-center justify-center overflow-visible rounded-full p-0.5 text-white2 transition-all duration-200 ease-in-out [&>svg]:relative [&>svg]:z-[1]',
+      'relative z-0 flex items-center justify-center overflow-visible rounded-full text-white2 transition-all duration-200 ease-in-out [&>svg]:relative [&>svg]:z-[1]',
       'data-[flip=true]:rotate-180',
       'data-[highlight=true]:text-primary',
       'data-[highlight=true]:after:pointer-events-none data-[highlight=true]:after:absolute data-[highlight=true]:after:-inset-px data-[highlight=true]:after:rounded-full data-[highlight=true]:after:bg-primary/25 data-[highlight=true]:after:content-[""]',
@@ -107,9 +108,9 @@ const SlippageSetting = ({ rightComponent, tooltip, slippageInfo }: Props) => {
     <div className="flex w-full flex-col">
       <div className="flex items-center justify-between gap-1 text-subText">
         <div className="flex items-center gap-1">
-          <TextDashed fontSize={12} fontWeight={500} className="flex h-fit items-center leading-none text-subText">
+          <TextDashed fontSize={12} fontWeight={500} className="flex h-fit items-center text-subText">
             <MouseoverTooltip
-              placement="right"
+              placement="bottom"
               text={
                 tooltip || (
                   <span>
@@ -130,7 +131,11 @@ const SlippageSetting = ({ rightComponent, tooltip, slippageInfo }: Props) => {
               <Trans>Max Slippage</Trans>:
             </MouseoverTooltip>
           </TextDashed>
-          <div role="button" onClick={() => setExpanded(e => !e)} className="flex cursor-pointer items-center gap-1">
+          <div
+            role="button"
+            onClick={() => setExpanded(e => !e)}
+            className="flex cursor-pointer items-center gap-1 hover:brightness-[0.85]"
+          >
             <span className={cn('text-sm font-medium leading-none', isWarningSlippage ? 'text-warning' : 'text-text')}>
               {msg ? (
                 <MouseoverTooltip text={slippageInfo ? msg : t`Your slippage ${msg}`}>
@@ -142,7 +147,7 @@ const SlippageSetting = ({ rightComponent, tooltip, slippageInfo }: Props) => {
             </span>
 
             <DropdownIcon size={14} data-flip={expanded} data-highlight={!expanded && defaultSlp !== rawSlippage}>
-              <ChevronDown size={14} strokeWidth={4} />
+              <ChevronDown size={14} />
             </DropdownIcon>
           </div>
         </div>
@@ -173,7 +178,7 @@ const SlippageSetting = ({ rightComponent, tooltip, slippageInfo }: Props) => {
                 <div
                   role="button"
                   onClick={() => setRawSlippage(defaultSlp)}
-                  className="flex w-fit cursor-pointer items-center gap-1 px-1 text-xs text-primary"
+                  className="flex w-fit cursor-pointer items-center gap-1 px-1 text-xs text-primary hover:brightness-125"
                 >
                   <MouseoverTooltip text={<Trans>Dynamic entry based on trading pair.</Trans>} placement="bottom">
                     <span className="border-b border-dotted border-primary">

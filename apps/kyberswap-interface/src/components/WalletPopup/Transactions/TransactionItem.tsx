@@ -15,7 +15,6 @@ import PendingWarning from 'components/WalletPopup/Transactions/PendingWarning'
 import PoolFarmLink from 'components/WalletPopup/Transactions/PoolFarmLink'
 import Status from 'components/WalletPopup/Transactions/Status'
 import { isTxsPendingTooLong } from 'components/WalletPopup/Transactions/helper'
-import { CancellingOrderInfo } from 'components/swapv2/LimitOrder/useCancellingOrders'
 import { APP_PATHS, ETHER_ADDRESS } from 'constants/index'
 import {
   TRANSACTION_TYPE,
@@ -211,7 +210,7 @@ const DescriptionStakeFarm = (transaction: TransactionDetails) => {
 const DESCRIPTION_MAP: {
   [type in TRANSACTION_TYPE]: (
     txs: TransactionDetails,
-  ) => null | JSX.Element | { leftComponent: ReactNode; rightComponent: ReactNode }
+  ) => null | React.JSX.Element | { leftComponent: ReactNode; rightComponent: ReactNode }
 } = {
   [TRANSACTION_TYPE.ELASTIC_FORCE_WITHDRAW_LIQUIDITY]: DescriptionBasic,
   [TRANSACTION_TYPE.KYBERDAO_VOTE]: DescriptionBasic,
@@ -238,6 +237,7 @@ const DESCRIPTION_MAP: {
   [TRANSACTION_TYPE.SWAP]: Description2Token,
   [TRANSACTION_TYPE.KYBERDAO_MIGRATE]: Description2Token,
 
+  [TRANSACTION_TYPE.FILL_LIMIT_ORDER]: DescriptionLimitOrder,
   [TRANSACTION_TYPE.CANCEL_LIMIT_ORDER]: DescriptionLimitOrder,
 
   [TRANSACTION_TYPE.CLASSIC_CREATE_POOL]: DescriptionLiquidity,
@@ -266,11 +266,10 @@ type Prop = {
   transaction: TransactionDetails
   style: CSSProperties
   isMinimal: boolean
-  cancellingOrderInfo: CancellingOrderInfo
 }
 
 const TransactionItem = forwardRef<HTMLDivElement, Prop>(function TransactionItem(
-  { transaction, style, isMinimal, cancellingOrderInfo }: Prop,
+  { transaction, style, isMinimal }: Prop,
   ref,
 ) {
   const { type, addedTime, hash, chainId } = transaction
@@ -299,7 +298,7 @@ const TransactionItem = forwardRef<HTMLDivElement, Prop>(function TransactionIte
           <span className="text-sm text-text">{type}</span>
           <ExternalLinkIcon color="var(--ks-subText)" href={getEtherscanLink(chainId, hash, 'transaction')} />
         </Row>
-        <Status transaction={transaction} cancellingOrderInfo={cancellingOrderInfo} />
+        <Status transaction={transaction} />
       </div>
 
       <div className="flex justify-between">

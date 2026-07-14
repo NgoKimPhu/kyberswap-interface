@@ -3,10 +3,12 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 
 import Banner from 'components/Banner'
 import { FarmingPoolBanner, TrendingPoolBanner } from 'components/EarnBanner'
+import LimitOrderForm from 'components/LimitOrder/Form/LimitOrderForm'
+import { LimitOrderProvider } from 'components/LimitOrder/LimitOrderContext'
+import OrderList from 'components/LimitOrder/OrderList'
+import { Stack } from 'components/Stack'
 import { SwitchLocaleLink } from 'components/SwitchLocaleLink'
 import { TutorialIds } from 'components/Tutorial/TutorialSwap/constant'
-import LimitOrder from 'components/swapv2/LimitOrder'
-import ListLimitOrder from 'components/swapv2/LimitOrder/ListLimitOrder'
 import LiquiditySourcesPanel from 'components/swapv2/LiquiditySourcesPanel'
 import SettingsPanel from 'components/swapv2/SwapSettingsPanel'
 import useRequiredDegenMode from 'components/swapv2/SwapSettingsPanel/useRequiredDegenMode'
@@ -15,7 +17,6 @@ import { Container, InfoComponentsWrapper, PageWrapper, SwapFormWrapper } from '
 import { APP_PATHS } from 'constants/index'
 import { PRICE_CHART_QUOTE_TOKEN_BY_CHAIN } from 'constants/tokens'
 import { useActiveWeb3React } from 'hooks'
-import { useAllTokens } from 'hooks/Tokens'
 import { NETWORKS_INFO } from 'hooks/useChainsConfig'
 import useParsedQueryString from 'hooks/useParsedQueryString'
 import CrossChainSwap from 'pages/CrossChainSwap'
@@ -27,11 +28,11 @@ import SwapTradeRoute from 'pages/SwapV3/Components/SwapTradeRoute'
 import TokenPriceChart from 'pages/SwapV3/Components/TokenPriceChart'
 import Header from 'pages/SwapV3/Header'
 import PopulatedSwapForm from 'pages/SwapV3/PopulatedSwapForm'
-import { AppBodyWrapped, BannerWrapper, SwitchLocaleLinkWrapper } from 'pages/SwapV3/styles'
+import { AppBodyWrapped, BannerWrapper } from 'pages/SwapV3/styles'
 import useCurrenciesByPage from 'pages/SwapV3/useCurrenciesByPage'
 import { useShowPricingChart, useShowTradeRoutes } from 'state/user/hooks'
 import { DetailedRouteSummary } from 'types/route'
-import { getTradeComposition } from 'utils/aggregationRouting'
+import { useTradeComposition } from 'utils/aggregationRouting'
 
 const InfoComponents = ({ children }: { children: ReactNode[] }) => {
   return children.filter(Boolean).length ? <InfoComponentsWrapper>{children}</InfoComponentsWrapper> : null
@@ -54,7 +55,6 @@ export default function Swap() {
   const { chainId } = useActiveWeb3React()
   const isShowPricingChart = useShowPricingChart()
   const isShowTradeRoutes = useShowTradeRoutes()
-  const defaultTokens = useAllTokens()
   const { currencies, currencyIn, currencyOut } = useCurrenciesByPage()
   const qs = useParsedQueryString<{ highlightBox: string }>()
   const [routeSummary, setRouteSummary] = useState<DetailedRouteSummary>()
@@ -90,11 +90,14 @@ export default function Swap() {
   const [activeTab, setActiveTab] = useState<TAB>(getDefaultTab())
   const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null)
 
-  useRequiredDegenMode({ activeTab, setActiveTab })
+  const highlightDegenMode = useRequiredDegenMode({ setActiveTab })
 
   useEffect(() => {
     setActiveTab(getDefaultTab())
   }, [getDefaultTab])
+
+  const isSetting = isSettingTab(activeTab)
+  const activeMainTab = isSetting ? getDefaultTab() : activeTab
 
   const tabFromUrl = searchParams.get('tab')
   useEffect(() => {
@@ -105,9 +108,11 @@ export default function Swap() {
     }
   }, [tabFromUrl, searchParams, setSearchParams])
 
-  const tradeRouteComposition = useMemo(() => {
-    return getTradeComposition(chainId, routeSummary?.parsedAmountIn, undefined, routeSummary?.route, defaultTokens)
-  }, [chainId, defaultTokens, routeSummary])
+  const tradeRouteComposition = useTradeComposition({
+    chainId,
+    inputAmount: routeSummary?.parsedAmountIn,
+    swaps: routeSummary?.route,
+  })
 
   const isSmartSettlementActive = useMemo(
     () => routeSummary?.route?.some(route => route.some(swap => swap.extra?._ce)),
@@ -119,17 +124,17 @@ export default function Swap() {
   const onBackToSwapTab = () => setActiveTab(getDefaultTab())
 
   return (
-    <>
-      <PageWrapper>
-        <Banner />
-        <Container>
+    <PageWrapper>
+      <Banner />
+      <Container>
+        <LimitOrderProvider>
           <SwapFormWrapper>
-            <Header activeTab={activeTab} setActiveTab={setActiveTab} />
+            <Header activeTab={activeTab} setActiveTab={setActiveTab} activeMainTab={activeMainTab} />
 
             <AppBodyWrapped
               data-highlight={shouldHighlightSwapBox}
               id={TutorialIds.SWAP_FORM}
-              style={[TAB.INFO, TAB.LIMIT].includes(activeTab) ? { padding: 0 } : undefined}
+              style={activeTab === TAB.INFO ? { padding: 0 } : undefined}
             >
               {isSwapPage && (
                 <PopulatedSwapForm
@@ -143,6 +148,7 @@ export default function Swap() {
                 <SettingsPanel
                   isCrossChainPage={isCrossChainPage}
                   isSwapPage={isSwapPage}
+                  highlightDegenMode={highlightDegenMode}
                   onBack={onBackToSwapTab}
                   onClickLiquiditySources={() => setActiveTab(TAB.LIQUIDITY_SOURCES)}
                   onClickCrossChainSources={() => setActiveTab(TAB.CROSS_CHAIN_SOURCES)}
@@ -151,7 +157,7 @@ export default function Swap() {
               {activeTab === TAB.LIQUIDITY_SOURCES && (
                 <LiquiditySourcesPanel onBack={() => setActiveTab(TAB.SETTINGS)} />
               )}
-              {activeTab === TAB.LIMIT && <LimitOrder />}
+              {activeTab === TAB.LIMIT && <LimitOrderForm />}
               {activeTab === TAB.CROSS_CHAIN && <CrossChainSwap onQuoteChange={setSelectedQuote} />}
               {activeTab === TAB.CROSS_CHAIN_SOURCES && (
                 <CrossChainSwapSources onBack={() => setActiveTab(TAB.SETTINGS)} />
@@ -179,21 +185,17 @@ export default function Swap() {
               />
             )}
 
-            {isLimitPage && <ListLimitOrder />}
+            {isLimitPage && <OrderList />}
             {isCrossChainPage && (
-              <div className="flex flex-col gap-4">
-                <QuoteSteps quote={selectedQuote} />
+              <Stack className="gap-4">
+                <QuoteSteps visible={false} quote={selectedQuote} />
                 <TransactionHistory />
-              </div>
+              </Stack>
             )}
           </InfoComponents>
-        </Container>
-        <div className="flex justify-center">
-          <SwitchLocaleLinkWrapper>
-            <SwitchLocaleLink />
-          </SwitchLocaleLinkWrapper>
-        </div>
-      </PageWrapper>
-    </>
+        </LimitOrderProvider>
+      </Container>
+      <SwitchLocaleLink centered />
+    </PageWrapper>
   )
 }

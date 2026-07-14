@@ -6,6 +6,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 import { Stack } from 'components/Stack'
+import { useIsTokenAddressRestricted } from 'hooks/useRestrictedTokens'
 import useTheme from 'hooks/useTheme'
 import TokenAmountInput, {
   TokenAmountInputSkeleton,
@@ -84,9 +85,14 @@ const AddLiquidityTokenInput = ({
 }: AddLiquidityTokenInputProps) => {
   const theme = useTheme()
   const [openTokenSelectModal, setOpenTokenSelectModal] = useState(false)
-  const [tokenAddressSelected, setTokenAddressSelected] = useState<string>()
 
   const { chainId, poolType, poolAddress, pool } = context
+
+  const isAddressRestricted = useIsTokenAddressRestricted()
+  const isTokenRestricted = useCallback(
+    (token: Token) => isAddressRestricted(chainId, token.address),
+    [isAddressRestricted, chainId],
+  )
   const { token0, token1 } = pool
 
   const currentTokens = value?.tokens ?? EMPTY_TOKENS
@@ -102,11 +108,9 @@ const AddLiquidityTokenInput = ({
 
   const onCloseTokenSelectModal = useCallback(() => {
     setOpenTokenSelectModal(false)
-    setTokenAddressSelected(undefined)
   }, [])
 
-  const openTokenSelectModalForToken = useCallback((address?: string) => {
-    setTokenAddressSelected(address)
+  const openTokenSelectModalForToken = useCallback(() => {
     setOpenTokenSelectModal(true)
   }, [])
 
@@ -241,10 +245,10 @@ const AddLiquidityTokenInput = ({
               amountsIn: currentAmounts,
               setTokensIn: handleWrappedSetTokensIn,
               setAmountsIn: nextAmounts => onAmountsChange?.(nextAmounts),
-              mode: tokenAddressSelected ? TOKEN_SELECT_MODE.SELECT : TOKEN_SELECT_MODE.ADD,
-              selectedTokenAddress: tokenAddressSelected,
+              mode: TOKEN_SELECT_MODE.ADD,
               token0Address: token0.address,
               token1Address: token1.address,
+              isTokenRestricted,
             }}
             positionOptions={{
               showUserPositions: !!onOpenZapMigration,

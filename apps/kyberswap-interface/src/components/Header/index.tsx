@@ -15,41 +15,41 @@ import Menu from 'components/Menu'
 import RecapButton from 'components/Recap/RecapButton'
 import { AGGREGATOR_ANALYTICS_URL, APP_PATHS } from 'constants/index'
 import { Z_INDEXS } from 'constants/styles'
-import { useActiveWeb3React } from 'hooks'
 import usePageLocation from 'hooks/usePageLocation'
 import { useHolidayMode } from 'state/user/hooks'
 import { MEDIA_WIDTHS } from 'theme'
 import { cn } from 'utils/cn'
 
-const IconImage = ({ isChristmas, src, alt }: { isChristmas?: boolean; src: string; alt: string }) => (
+const LogoImage = ({ isChristmas, src, alt }: { isChristmas?: boolean; src: string; alt: string }) => (
   <img
     src={src}
     alt={alt}
-    className={cn(
-      'w-[140px] max-w-none max-sm:w-[114px] max-xs:w-[100px]',
-      isChristmas ? 'mt-[-9px] max-sm:-mt-0.5' : 'mt-px',
-    )}
+    className={cn('w-[140px] max-w-none max-sm:w-[100px]', isChristmas ? '-mt-3 max-sm:-mt-2' : '-mt-0.5')}
   />
 )
 
 const LogoIcon = ({ children }: { children: React.ReactNode }) => (
-  <div className="transition-transform duration-300 hover:rotate-[-5deg] max-xs:hover:rotate-0">{children}</div>
+  <div className="flex min-h-12 items-center transition-transform duration-300 hover:rotate-[-5deg] max-sm:min-h-9 max-xs:hover:rotate-0">
+    {children}
+  </div>
 )
 
 export default function Header() {
-  const { networkInfo } = useActiveWeb3React()
   const [holidayMode] = useHolidayMode()
   const { isEmbeddedSwap } = usePageLocation()
 
   const upToXXSmall = useMedia(`(max-width: ${MEDIA_WIDTHS.upToXXSmall}px)`)
   const upToLarge = useMedia(`(max-width: ${MEDIA_WIDTHS.upToLarge}px)`)
   const upToMedium = useMedia(`(max-width: ${MEDIA_WIDTHS.upToMedium}px)`)
+  const upToSmall = useMedia(`(max-width: ${MEDIA_WIDTHS.upToSmall}px)`)
   const upToExtraSmall = useMedia(`(max-width: ${MEDIA_WIDTHS.upToExtraSmall}px)`)
+  const upTo500 = useMedia('(max-width: 500px)')
 
   const hide = isEmbeddedSwap && upToLarge
+  const navGroupDropdownAlign = upToMedium ? 'right' : 'left'
 
   const menu = (
-    <div className="flex items-center gap-2 rounded-[36px] border border-background bg-background px-1.5 text-subText hover:border-primary hover:brightness-105 focus:border-primary focus:brightness-105">
+    <div className="flex items-center gap-2 rounded-[36px] border border-background bg-background px-1.5 text-subText hover:border-border-primary hover:brightness-105">
       <Announcement />
       <div style={{ height: '18px', borderLeft: '2px solid var(--ks-subText)' }} />
       <Menu />
@@ -60,55 +60,56 @@ export default function Header() {
     <div
       style={{ zIndex: Z_INDEXS.HEADER }}
       className={cn(
-        'relative top-0 grid w-full items-center justify-between border-b border-black/10',
+        'relative top-0 grid w-full items-center justify-between',
         'grid-cols-[1fr_120px] flex-row p-4',
         'max-lg:grid-cols-[1fr]',
-        'max-xs:px-4 max-xs:py-2',
         hide && '!h-0 !overflow-hidden !p-0',
-        hide ? 'max-xs:!h-0' : 'max-xs:h-[60px]',
       )}
     >
-      <div className="flex w-fit flex-row flex-nowrap items-center justify-self-start max-md:w-full">
+      <div className="flex w-fit flex-row flex-nowrap items-center gap-3 justify-self-start max-md:w-full">
         {isEmbeddedSwap ? (
           <LogoIcon>
-            <IconImage src={'/logo-dark.svg'} alt="logo" />
+            <LogoImage src={'/logo-dark.svg'} alt="logo" />
           </LogoIcon>
         ) : (
           <Link
-            to={`${APP_PATHS.SWAP}/${networkInfo.route}`}
-            className="mr-3 flex cursor-pointer items-center justify-self-start hover:cursor-pointer max-sm:justify-self-center"
+            to="/"
+            className="flex cursor-pointer items-center justify-self-start hover:cursor-pointer max-sm:justify-self-center"
           >
             {holidayMode ? (
               <LogoIcon>
-                <IconImage isChristmas src={'/christmas-logo-dark.svg?'} alt="logo" />
+                <LogoImage isChristmas src={'/christmas-logo-dark.svg?'} alt="logo" />
               </LogoIcon>
             ) : (
               <LogoIcon>
-                <IconImage src={'/logo-dark.svg'} alt="logo" />
+                <LogoImage src={'/logo-dark.svg'} alt="logo" />
               </LogoIcon>
             )}
           </Link>
         )}
         {!isEmbeddedSwap && (
-          <div className="flex w-full flex-row flex-nowrap items-center justify-center gap-1 max-lg:justify-end max-xxs:gap-0">
-            <SwapNavGroup />
-            <EarnNavGroup />
+          <nav
+            aria-label="Primary"
+            className="flex w-full flex-row flex-nowrap items-center justify-center gap-1 max-lg:justify-end"
+          >
+            <SwapNavGroup dropdownAlign={navGroupDropdownAlign} />
+            <EarnNavGroup dropdownAlign={navGroupDropdownAlign} />
 
             {!upToExtraSmall && (
               <StyledNavLink to={`${APP_PATHS.MARKET_OVERVIEW}`}>
                 <Trans>Market</Trans>
               </StyledNavLink>
             )}
-            <CampaignNavGroup />
-            <KyberDAONavGroup />
+            {!upTo500 && <CampaignNavGroup dropdownAlign={navGroupDropdownAlign} />}
+            {!upToMedium && <KyberDAONavGroup dropdownAlign={navGroupDropdownAlign} />}
             {!upToMedium && (
               <StyledNavExternalLink target="_blank" href={AGGREGATOR_ANALYTICS_URL}>
                 <Trans>Analytics</Trans>
               </StyledNavExternalLink>
             )}
-            <AboutNavGroup />
+            {!upToSmall && <AboutNavGroup dropdownAlign={navGroupDropdownAlign} />}
             <RecapButton />
-          </div>
+          </nav>
         )}
       </div>
 
@@ -117,15 +118,14 @@ export default function Header() {
           'flex flex-row items-center gap-2 justify-self-end',
           'max-lg:fixed max-lg:bottom-0 max-lg:left-0 max-lg:z-[98] max-lg:h-[72px] max-lg:w-full',
           'max-lg:justify-between max-lg:justify-self-center max-lg:bg-buttonBlack max-lg:p-4',
-          'max-sm:h-[60px]',
-          'max-[500px]:px-2 max-[500px]:py-4',
+          'max-sm:h-[60px] max-sm:p-2',
         )}
       >
         {isEmbeddedSwap ? (
           <div className="flex w-full justify-between">
             {upToLarge && (
               <LogoIcon>
-                <IconImage src={'/logo-dark.svg'} alt="logo" />
+                <LogoImage src={'/logo-dark.svg'} alt="logo" />
               </LogoIcon>
             )}
 

@@ -1,12 +1,7 @@
-import { Currency, CurrencyAmount } from '@kyberswap/ks-sdk-core'
-import { t } from '@lingui/macro'
-import React, { ButtonHTMLAttributes, CSSProperties, ReactNode, forwardRef, useRef } from 'react'
-import { ChevronDown, Info } from 'react-feather'
+import React, { ButtonHTMLAttributes, CSSProperties, forwardRef } from 'react'
+import { ChevronDown } from 'react-feather'
 
-import Loader from 'components/Loader'
 import { RowBetween } from 'components/Row'
-import { MouseoverTooltip } from 'components/Tooltip'
-import { ApprovalState } from 'hooks/useApproveCallback'
 import { cn } from 'utils/cn'
 
 const toCssLength = (v: string | number | undefined): string | undefined => {
@@ -197,7 +192,7 @@ type ButtonVariantClass = string | ((props: ButtonProps) => string)
 // overrides). Consumer-supplied shorthand props (padding, width, etc.) become inline style and
 // override the Tailwind defaults at the inline-style level.
 const BASE_CLASS =
-  'relative z-10 flex w-full h-auto cursor-pointer items-center justify-center rounded-full border border-solid border-transparent p-3 text-center text-sm leading-[normal] font-medium text-white no-underline outline-none [&>*]:select-none hover:brightness-[0.8] disabled:cursor-auto disabled:hover:!filter-none'
+  'relative z-10 flex w-full h-auto cursor-pointer items-center justify-center rounded-full border border-solid border-transparent p-3 text-center text-sm leading-[normal] font-medium text-white no-underline outline-none [&>*]:select-none hover:brightness-[1.2] disabled:cursor-auto disabled:hover:!filter-none'
 
 const buildBase = (variantClass: ButtonVariantClass, displayName: string) => {
   const Component = forwardRef<HTMLElement, ButtonProps>(
@@ -235,7 +230,7 @@ const buildBase = (variantClass: ButtonVariantClass, displayName: string) => {
 export const ButtonPrimary = buildBase(
   (props: ButtonProps) =>
     cn(
-      'bg-primary text-textReverse active:shadow-[0_0_0_1pt_var(--ks-primary)] active:brightness-90',
+      'bg-primary text-textReverse hover:text-textReverse active:shadow-[0_0_0_1pt_var(--ks-primary)] active:brightness-90',
       'disabled:!bg-buttonGray disabled:text-border disabled:!shadow-none',
       props.altDisabledStyle && 'disabled:!bg-primary disabled:!text-textReverse disabled:!opacity-50',
       props.$disabled && '!bg-buttonGray text-border !shadow-none',
@@ -246,10 +241,9 @@ export const ButtonPrimary = buildBase(
 export const ButtonWarning = buildBase(
   (props: ButtonProps) =>
     cn(
-      'bg-warning text-textReverse focus:shadow-[0_0_0_1pt_var(--ks-warning)] focus:brightness-95',
-      'active:shadow-[0_0_0_1pt_var(--ks-warning)] active:brightness-90',
-      'disabled:!cursor-auto disabled:!bg-warning-20 disabled:!text-warning',
-      props.$disabled && '!cursor-auto !bg-warning-20 !text-warning',
+      'bg-warning text-textReverse hover:!brightness-95 active:!brightness-90',
+      'disabled:!cursor-auto disabled:!bg-warning-20 disabled:!text-textReverse disabled:!shadow-none',
+      props.$disabled && '!cursor-auto !bg-warning-20 !text-textReverse !shadow-none',
     ),
   'ButtonWarning',
 )
@@ -369,117 +363,3 @@ export function ButtonDropdownLight({
     </ButtonOutlined>
   )
 }
-
-// button with info helper in side - in mobile verify to touch info icon => enlarge region for tooltip
-export const ButtonWithInfoHelper = ({
-  tooltipMsg,
-  onClick,
-  disabled,
-  text,
-  confirmed,
-  loading,
-}: {
-  tooltipMsg: string
-  onClick: (() => void) | undefined | (() => Promise<void>)
-  disabled: boolean
-  loading: boolean
-  confirmed?: boolean
-  text?: ReactNode
-}) => {
-  return (
-    <ButtonConfirmed
-      disabled={disabled}
-      altDisabledStyle={loading}
-      confirmed={confirmed}
-      onClick={onClick}
-      className="h-11 w-[48%] p-0"
-    >
-      <MouseoverTooltip width="300px" text={tooltipMsg} disableTooltip={loading}>
-        <div className="flex h-11 items-center pl-0.5 pr-2" onClick={e => e.stopPropagation()}>
-          {loading ? <Loader className="text-white" /> : <Info size={20} />}
-        </div>
-      </MouseoverTooltip>
-      <span className="text-left">{text}</span>
-    </ButtonConfirmed>
-  )
-}
-
-export const ButtonApprove = ({
-  tooltipMsg,
-  tokenSymbol,
-  approval,
-  approveCallback,
-  disabled,
-  forceApprove = false,
-}: {
-  tooltipMsg: string
-  tokenSymbol: string | undefined
-  approval: ApprovalState
-  approveCallback: (customAllowance?: CurrencyAmount<Currency>) => Promise<void>
-  disabled: boolean
-  forceApprove?: boolean
-}) => {
-  const loading = useRef(false)
-  const approveWrap = () => {
-    if (loading.current) return
-    loading.current = true
-    approveCallback()
-      .catch(() => {
-        // do nothing
-      })
-      .finally(() => {
-        loading.current = false
-      })
-  }
-
-  return (
-    <ButtonWithInfoHelper
-      loading={approval === ApprovalState.PENDING}
-      tooltipMsg={tooltipMsg}
-      disabled={disabled}
-      onClick={approveWrap}
-      confirmed={approval === ApprovalState.APPROVED && !forceApprove}
-      text={
-        approval === ApprovalState.PENDING
-          ? t`Approving`
-          : approval === ApprovalState.APPROVED
-          ? t`Approved ${tokenSymbol}`
-          : t`Approve ${tokenSymbol}`
-      }
-    />
-  )
-}
-
-export const ButtonAction = forwardRef<
-  HTMLButtonElement,
-  ButtonHTMLAttributes<HTMLButtonElement> & { color?: string; children: ReactNode }
->(({ onClick, children, color, className, style, ...rest }, ref) => {
-  // Replicate original styled rules: bg = `${color}32` (20% alpha) default,
-  // `${color}20` (12%) on hover, `${color}10` (6%) on active.
-  // When no color is supplied, fall back to subText/20 alpha token for hover.
-  const colorStyle: React.CSSProperties = color
-    ? ({
-        backgroundColor: `${color}32`,
-        color,
-        '--ks-btn-action-hover': `${color}20`,
-        '--ks-btn-action-active': `${color}10`,
-      } as React.CSSProperties)
-    : { backgroundColor: 'transparent' }
-  return (
-    <button
-      ref={ref}
-      onClick={onClick}
-      {...rest}
-      style={{ ...colorStyle, ...style }}
-      className={cn(
-        'flex cursor-pointer appearance-none items-center rounded-full border-none p-0.5 outline-none transition-all duration-100',
-        color ? 'hover:bg-[var(--ks-btn-action-hover)] active:bg-[var(--ks-btn-action-active)]' : 'hover:bg-subText-20',
-        'active:translate-y-0.5',
-        className,
-      )}
-    >
-      {children}
-    </button>
-  )
-})
-ButtonAction.displayName = 'ButtonAction'

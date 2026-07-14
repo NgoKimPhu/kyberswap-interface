@@ -2,13 +2,15 @@ import { Trans, t } from '@lingui/macro'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMedia } from 'react-use'
-import { useUserPositionsQuery } from 'services/zapEarn'
+import { useUserPositionsQuery } from 'services/earn'
 
 import { ReactComponent as FarmingIcon } from 'assets/svg/kyber/kem.svg'
 import { ReactComponent as RocketIcon } from 'assets/svg/rocket.svg'
+import { default as MultiSelectDropdownMenu } from 'components/DropdownMenu/MultiSelect'
+import { ItemIcon } from 'components/DropdownMenu/styles'
 import InfoHelper from 'components/InfoHelper'
-import LocalLoader from 'components/LocalLoader'
 import Pagination from 'components/Pagination'
+import RefetchIndicator from 'components/RefetchIndicator'
 import { HiddenH1, HiddenH2 } from 'components/Seo/HiddenSeoHeadings'
 import { APP_PATHS } from 'constants/index'
 import { useActiveWeb3React } from 'hooks'
@@ -16,7 +18,9 @@ import { ContentWrapper, Disclaimer, NavigateButton } from 'pages/Earns/PoolExpl
 import { IconArrowLeft } from 'pages/Earns/PositionDetail/styles'
 import Filter from 'pages/Earns/UserPositions/Filter'
 import PositionBanner from 'pages/Earns/UserPositions/PositionBanner'
+import PositionListSkeleton from 'pages/Earns/UserPositions/PositionListSkeleton'
 import TableContent, { FeeInfoFromRpc } from 'pages/Earns/UserPositions/TableContent'
+import { toPositionQueryParams } from 'pages/Earns/UserPositions/positionsQuery'
 import {
   PositionPageWrapper,
   PositionTableHeader,
@@ -25,9 +29,6 @@ import {
   PositionTableWrapper,
 } from 'pages/Earns/UserPositions/styles'
 import useFilter, { SortBy } from 'pages/Earns/UserPositions/useFilter'
-import { default as MultiSelectDropdownMenu } from 'pages/Earns/components/DropdownMenu/MultiSelect'
-import { ItemIcon } from 'pages/Earns/components/DropdownMenu/styles'
-import RefetchIndicator from 'pages/Earns/components/RefetchIndicator'
 import useAccountChanged from 'pages/Earns/hooks/useAccountChanged'
 import useClosedPositions from 'pages/Earns/hooks/useClosedPositions'
 import useKemRewards from 'pages/Earns/hooks/useKemRewards'
@@ -57,17 +58,7 @@ const UserPositions = () => {
   const { closedPositionsFromRpc, checkClosedPosition } = useClosedPositions()
 
   const positionQueryParams = useMemo(() => {
-    return {
-      wallet: account || '',
-      chainIds: filters.chainIds,
-      protocols: filters.protocols,
-      statuses: filters.statuses,
-      keyword: filters.keyword,
-      positionIds: filters.positionId,
-      sorts: [filters.sortBy, filters.orderBy].filter(Boolean).join(':'),
-      page: filters.page,
-      pageSize: filters.pageSize,
-    }
+    return toPositionQueryParams(filters, account)
   }, [account, filters])
 
   const {
@@ -290,6 +281,7 @@ const UserPositions = () => {
         <div className={cn('flex justify-between gap-2', upToSmall ? 'flex-col items-start' : 'flex-row items-center')}>
           <MultiSelectDropdownMenu
             highlightOnSelect
+            showOnlyButton
             label={selectedChainsLabel || t`Select chains`}
             options={supportedChains.length ? supportedChains : [AllChainsOption]}
             value={filters.chainIds || ''}
@@ -377,7 +369,7 @@ const UserPositions = () => {
               </PositionTableHeader>
             )}
             {isFetching && loading ? (
-              <LocalLoader />
+              <PositionListSkeleton />
             ) : (
               <TableContent
                 positions={filteredPositions}

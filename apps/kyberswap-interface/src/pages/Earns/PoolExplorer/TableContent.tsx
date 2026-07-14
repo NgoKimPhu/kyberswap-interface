@@ -1,13 +1,14 @@
 import { t } from '@lingui/macro'
 import { useMemo } from 'react'
 import { useMedia } from 'react-use'
-import { PoolQueryParams, usePoolsExplorerQuery } from 'services/zapEarn'
+import { usePoolsExplorerQuery } from 'services/earn'
+import type { PoolQueryParams } from 'services/earn/types'
 
-import LocalLoader from 'components/LocalLoader'
+import RefetchIndicator from 'components/RefetchIndicator'
 import { Stack } from 'components/Stack'
 import DesktopTableRow from 'pages/Earns/PoolExplorer/DesktopTableRow'
 import MobileTableRow from 'pages/Earns/PoolExplorer/MobileTableRow'
-import RefetchIndicator from 'pages/Earns/PoolExplorer/RefetchIndicator'
+import PoolListSkeleton from 'pages/Earns/PoolExplorer/PoolListSkeleton'
 import useFavoritePool from 'pages/Earns/PoolExplorer/useFavoritePool'
 import { EARN_DEXES } from 'pages/Earns/constants'
 import { ZapInInfo } from 'pages/Earns/hooks/useZapInWidget'
@@ -89,7 +90,7 @@ const TableContent = ({ onOpenZapInWidget, filters, showRewards = true, showPool
   }, [poolData?.data?.pools, dexLookupMap, getFavoriteStatus])
 
   if (isLoading) {
-    return <LocalLoader />
+    return <PoolListSkeleton showRewards={showRewards} showPoolPrice={showPoolPrice} />
   }
 
   if (poolData?.data?.pools.length === 0 || isError) {
@@ -102,10 +103,11 @@ const TableContent = ({ onOpenZapInWidget, filters, showRewards = true, showPool
 
       {upToMedium ? (
         <Stack className="gap-4">
-          {tablePoolData.map(pool => (
+          {tablePoolData.map((pool, index) => (
             <MobileTableRow
               key={pool.address}
               pool={pool}
+              rowIndex={index}
               showRewards={showRewards}
               onOpenZapInWidget={onOpenZapInWidget}
               handleFavorite={handleFavorite}
@@ -113,10 +115,11 @@ const TableContent = ({ onOpenZapInWidget, filters, showRewards = true, showPool
           ))}
         </Stack>
       ) : (
-        tablePoolData.map(pool => (
+        tablePoolData.map((pool, index) => (
           <DesktopTableRow
             key={pool.address}
             pool={pool}
+            rowIndex={index}
             showRewards={showRewards}
             showPoolPrice={showPoolPrice}
             onOpenZapInWidget={onOpenZapInWidget}

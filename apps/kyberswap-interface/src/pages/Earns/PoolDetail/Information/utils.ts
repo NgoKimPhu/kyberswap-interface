@@ -1,7 +1,6 @@
-import { formatAprNumber, formatUnits } from '@kyber/utils/number'
-import { MAX_TICK, MIN_TICK, getPositionAmounts, nearestUsableTick } from '@kyber/utils/uniswapv3'
+import { formatAprNumber } from '@kyber/utils/number'
 import dayjs from 'dayjs'
-import { type PoolAnalyticsWindow, type PoolDetail } from 'services/zapEarn'
+import type { PoolAnalyticsWindow } from 'services/earn/types'
 
 import { type SegmentedControlOption } from 'components/SegmentedControl'
 import { formatDisplayNumber } from 'utils/numbers'
@@ -14,45 +13,6 @@ export const CHART_WINDOW_OPTIONS: readonly SegmentedControlOption<PoolAnalytics
 
 const hasValue = (value?: number | null): value is number =>
   value !== undefined && value !== null && !Number.isNaN(value)
-
-const getCurrentTickRange = (tick: number, tickSpacing: number) => {
-  const minTick = nearestUsableTick(MIN_TICK, tickSpacing)
-  const maxTick = nearestUsableTick(MAX_TICK, tickSpacing)
-  const tickLower = Math.min(Math.max(Math.floor(tick / tickSpacing) * tickSpacing, minTick), maxTick - tickSpacing)
-
-  return {
-    tickLower,
-    tickUpper: tickLower + tickSpacing,
-  }
-}
-
-export const getPoolLiquidityUsd = (pool: PoolDetail, tokenPrices: Record<string, number>) => {
-  const token0 = pool.tokens[0]
-  const token1 = pool.tokens[1]
-  const positionInfo = pool.positionInfo
-
-  if (!positionInfo?.liquidity || !positionInfo?.sqrtPriceX96 || !positionInfo?.tickSpacing) {
-    return undefined
-  }
-
-  const { tickLower, tickUpper } = getCurrentTickRange(positionInfo.tick, positionInfo.tickSpacing)
-  const { amount0, amount1 } = getPositionAmounts(
-    positionInfo.tick,
-    tickLower,
-    tickUpper,
-    BigInt(positionInfo.sqrtPriceX96),
-    BigInt(positionInfo.liquidity),
-  )
-
-  const token0Amount = parseFloat(formatUnits(amount0.toString(), token0.decimals))
-  const token1Amount = parseFloat(formatUnits(amount1.toString(), token1.decimals))
-  const token0Price = tokenPrices[token0.address] || 0
-  const token1Price = tokenPrices[token1.address] || 0
-
-  const liquidityUsd = token0Amount * token0Price + token1Amount * token1Price
-
-  return hasValue(liquidityUsd) && liquidityUsd > 0 ? liquidityUsd : undefined
-}
 
 export const formatUsd = (value?: number, options?: { allowDisplayNegative?: boolean }) => {
   if (!hasValue(value)) return '--'
@@ -73,6 +33,13 @@ export const formatPrice = (value?: number) => {
   })
 }
 
+export const formatRate = (value?: number) => {
+  if (!hasValue(value)) return '--'
+  return formatDisplayNumber(value, {
+    significantDigits: value !== 0 && Math.abs(value) < 1 ? 8 : 6,
+  })
+}
+
 export const formatSignedPercent = (value?: number) => {
   if (!hasValue(value)) return '--'
   return `${value > 0 ? '+' : value < 0 ? '-' : ''}${formatDisplayNumber(Math.abs(value), { significantDigits: 4 })}%`
@@ -87,13 +54,55 @@ export const formatCompactUsd = (value?: number) => {
   })
 }
 
-export const formatAxisTimeLabel = (timestamp: number, window: PoolAnalyticsWindow) => {
-  if (window === '24h') return dayjs.unix(timestamp).format('HH:mm')
-  if (window === '7d') return dayjs.unix(timestamp).format('MMM D')
-  return dayjs.unix(timestamp).format('MMM D')
+export const getUniqueDateAxisTicks = <T extends { ts: number }>(points: T[], window: PoolAnalyticsWindow) => {
+  if (window === '24h') return undefined
+
+  const dates = new Set<string>()
+
+  return points.reduce<number[]>((ticks, point) => {
+    const date = dayjs.unix(point.ts).format('YYYY-MM-DD')
+
+    if (!dates.has(date)) {
+      dates.add(date)
+      ticks.push(point.ts)
+    }
+
+    return ticks
+  }, [])
 }
 
-export const formatTooltipTimeLabel = (timestamp: number, window: PoolAnalyticsWindow) => {
-  if (window === '30d') return dayjs.unix(timestamp).format('MMM D, YYYY')
-  return dayjs.unix(timestamp).format('MMM D, HH:mm')
+export enum TimeLabelFormat {
+  Date = 'date',
+  DateTime = 'dateTime',
+  Time = 'time',
+}
+
+type AxisTimeLabelOptions = {
+  format?: TimeLabelFormat.Date | TimeLabelFormat.Time
+}
+
+type TooltipTimeLabelOptions = {
+  format?: TimeLabelFormat.Date | TimeLabelFormat.DateTime
+}
+
+const TIME_LABEL_FORMATS: Record<TimeLabelFormat, string> = {
+  [TimeLabelFormat.Date]: 'MMM D',
+  [TimeLabelFormat.DateTime]: 'MMM D, HH:mm',
+  [TimeLabelFormat.Time]: 'HH:mm',
+}
+
+export const formatAxisTimeLabel = (timestamp: number, window: PoolAnalyticsWindow, options?: AxisTimeLabelOptions) => {
+  const format = options?.format ?? (window === '24h' ? TimeLabelFormat.Time : TimeLabelFormat.Date)
+
+  return dayjs.unix(timestamp).format(TIME_LABEL_FORMATS[format])
+}
+
+export const formatTooltipTimeLabel = (
+  timestamp: number,
+  window: PoolAnalyticsWindow,
+  options?: TooltipTimeLabelOptions,
+) => {
+  const format = options?.format ?? (window === '24h' ? TimeLabelFormat.DateTime : TimeLabelFormat.Date)
+
+  return dayjs.unix(timestamp).format(TIME_LABEL_FORMATS[format])
 }

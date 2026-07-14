@@ -1,18 +1,18 @@
 import { ChainId, CurrencyAmount, Currency as EvmCurrency } from '@kyberswap/ks-sdk-core'
 import { Trans, t } from '@lingui/macro'
 import { useWalletSelector } from '@near-wallet-selector/react-hook'
-import { adaptSolanaWallet } from '@reservoir0x/relay-solana-wallet-adapter'
 import { useConnection, useWallet } from '@solana/wallet-adapter-react'
 import { Transaction, VersionedTransaction } from '@solana/web3.js'
-import { useEffect, useState } from 'react'
-import { ArrowDown, X } from 'react-feather'
+import { useState } from 'react'
+import { ArrowDown } from 'react-feather'
 import { useSearchParams } from 'react-router-dom'
 import { useLazyCheckBlackjackQuery } from 'services/blackjack'
 import { formatUnits } from 'viem'
 
-import { ButtonEmpty, ButtonPrimary } from 'components/Button'
+import { ButtonPrimary } from 'components/Button'
 import CopyHelper from 'components/Copy'
 import CurrencyLogo from 'components/CurrencyLogo'
+import { getTipLinkAttribution } from 'components/TipLinkGeneratorModal/shared'
 import TransactionConfirmationModal, { TransactionErrorContent } from 'components/TransactionConfirmationModal'
 import { useBitcoinWallet } from 'components/Web3Provider/BitcoinProvider'
 import { ETHER_ADDRESS } from 'constants/index'
@@ -20,13 +20,15 @@ import { NETWORKS_INFO } from 'constants/networks'
 import { useGatedWalletClient } from 'hooks/useGatedWalletClient'
 import useTracking, { CROSS_CHAIN_MIXPANEL_TYPE, TRACKING_EVENT_TYPE, useCrossChainMixpanel } from 'hooks/useTracking'
 import { Chain, Currency, NonEvmChain, NonEvmChainInfo } from 'pages/CrossChainSwap/adapters'
+import { adaptRelaySolanaWallet } from 'pages/CrossChainSwap/adapters/RelayAdapter/relaySolanaWallet'
 import { PiWarning } from 'pages/CrossChainSwap/components/PiWarning'
 import { QuoteProviderName } from 'pages/CrossChainSwap/components/QuoteProviderName'
 import { Summary } from 'pages/CrossChainSwap/components/Summary'
 import { useCrossChainSwap } from 'pages/CrossChainSwap/hooks/useCrossChainSwap'
+import { useRestoreMyNearWalletPendingTransaction } from 'pages/CrossChainSwap/hooks/useRestoreMyNearWalletPendingTransaction'
 import { getChainName } from 'pages/CrossChainSwap/utils'
 import { useCrossChainTransactions } from 'state/crossChainSwap'
-import { ExternalLink } from 'theme'
+import { CloseIcon, ExternalLink } from 'theme'
 import { getEtherscanLink, isEvmChain, shortenHash } from 'utils'
 import { formatDisplayNumber } from 'utils/numbers'
 
@@ -74,6 +76,7 @@ const TokenBoxInfo = ({
 export const ConfirmationPopup = ({ isOpen, onDismiss }: { isOpen: boolean; onDismiss: () => void }) => {
   const { crossChainMixpanelHandler } = useCrossChainMixpanel()
   const { trackingHandler } = useTracking()
+  const { data: walletClient } = useGatedWalletClient()
   const {
     selectedQuote,
     currencyIn,
@@ -86,35 +89,21 @@ export const ConfirmationPopup = ({ isOpen, onDismiss }: { isOpen: boolean; onDi
     sender,
     receiver,
   } = useCrossChainSwap()
-  const { data: walletClient } = useGatedWalletClient()
+
+  const [searchParams] = useSearchParams()
   const [submittingTx, setSubmittingTx] = useState(false)
   const [txHash, setTxHash] = useState('')
   const [txError, setTxError] = useState('')
   const [transactions, setTransactions] = useCrossChainTransactions()
-  const [searchParams, setSearchParams] = useSearchParams()
-  const transactionHashes = searchParams.get('transactionHashes')
-  useEffect(() => {
-    try {
-      const tx = JSON.parse(localStorage.getItem('cross-chain-swap-my-near-wallet-tx') || '')
-      if (transactionHashes && tx) {
-        setTransactions([tx, ...transactions].slice(0, 30))
-        localStorage.removeItem('cross-chain-swap-my-near-wallet-tx')
-        searchParams.delete('transactionHashes')
-        setSearchParams(searchParams)
-      }
-    } catch {
-      // do nothing
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [transactionHashes])
+
+  useRestoreMyNearWalletPendingTransaction()
 
   const nearWallet = useWalletSelector()
-
+  const solanaWallet = useWallet()
   const { walletInfo, availableWallets } = useBitcoinWallet()
 
   const [checkBlackjack] = useLazyCheckBlackjackQuery()
 
-  const solanaWallet = useWallet()
   const { publicKey: solanaAddress, sendTransaction } = solanaWallet
   const { connection } = useConnection()
 
@@ -156,7 +145,7 @@ export const ConfirmationPopup = ({ isOpen, onDismiss }: { isOpen: boolean; onDi
 
   const handleSwap = async () => {
     if (isEvmChain(fromChainId) && !walletClient) return
-    const adaptedWallet = adaptSolanaWallet(
+    const adaptedWallet = adaptRelaySolanaWallet(
       solanaAddress?.toString() || '1nc1nerator11111111111111111111111111111111',
       792703809, //chain id that Relay uses to identify solana
       connection,
@@ -178,11 +167,13 @@ export const ConfirmationPopup = ({ isOpen, onDismiss }: { isOpen: boolean; onDi
 
     setSubmittingTx(true)
 
-    const blackjackRes = await checkBlackjack(sender)
-    if (blackjackRes?.data?.blacklisted) {
-      setSubmittingTx(false)
-      setTxError('There was an error with your transaction.')
-      return
+    if (isEvmChain(fromChainId)) {
+      const blackjackRes = await checkBlackjack(sender)
+      if (blackjackRes?.data?.blacklisted) {
+        setSubmittingTx(false)
+        setTxError('There was an error with your transaction.')
+        return
+      }
     }
 
     const res = await selectedQuote.adapter
@@ -244,7 +235,7 @@ export const ConfirmationPopup = ({ isOpen, onDismiss }: { isOpen: boolean; onDi
         recipient: receiver,
       }
 
-      setTransactions([enriched, ...transactions].slice(0, 30))
+      setTransactions([enriched, ...transactions])
 
       const swapDetails = {
         amount_in: amount,
@@ -293,6 +284,26 @@ export const ConfirmationPopup = ({ isOpen, onDismiss }: { isOpen: boolean; onDi
       }
       crossChainMixpanelHandler(CROSS_CHAIN_MIXPANEL_TYPE.CROSS_CHAIN_SWAP_INIT, swapDetails)
       trackingHandler(TRACKING_EVENT_TYPE.CC_SWAP_INITIATED, swapDetails)
+
+      // Tip is not charged on cross-chain swaps — attribute referral volume at initiation
+      // (completion fires from an off-page poller that has lost the tip-link URL context).
+      const tipLink = getTipLinkAttribution(searchParams)
+      if (tipLink) {
+        trackingHandler(TRACKING_EVENT_TYPE.TIP_LINK_TRADE, {
+          trade_type: 'cross_chain',
+          trade_status: 'initiated',
+          tip_charged: false,
+          ...tipLink,
+          input_token: currencyIn?.symbol,
+          output_token: currencyOut?.symbol,
+          pair: currencyIn?.symbol && currencyOut?.symbol ? `${currencyIn.symbol}/${currencyOut.symbol}` : undefined,
+          chain: getChainName(fromChainId),
+          from_chain: getChainName(fromChainId),
+          to_chain: getChainName(toChainId),
+          volume: selectedQuote.quote.inputUsd,
+          tx_hash: res.sourceTxHash,
+        })
+      }
     }
     setTxHash(res?.sourceTxHash || '')
     setSubmittingTx(false)
@@ -334,9 +345,7 @@ export const ConfirmationPopup = ({ isOpen, onDismiss }: { isOpen: boolean; onDi
           <div className="flex w-full flex-col p-4">
             <div className="mb-3 flex items-center justify-between">
               <span className="text-xl font-medium">{t`Confirm Swap Details`}</span>
-              <ButtonEmpty width="fit-content" padding="0" onClick={onDismiss}>
-                <X size={20} className="text-text" />
-              </ButtonEmpty>
+              <CloseIcon onClick={onDismiss} />
             </div>
             <span className="mb-4 text-xs text-subText">{t`Please review the details of your swap`}</span>
             <TokenBoxInfo

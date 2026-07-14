@@ -26,7 +26,7 @@ export default function LimitTab({ onClick, active, customChainId }: Props) {
 
   const { data: { totalOrder = 0 } = {} } = useGetListOrdersQuery(
     {
-      chainId,
+      chainIds: [chainId],
       maker: account,
       status: 'active',
       query: '',
@@ -43,10 +43,10 @@ export default function LimitTab({ onClick, active, customChainId }: Props) {
 
   return (
     <Tab id="limit-button" data-testid="limit-button" onClick={onClick} $isActive={active || isLimitPage}>
-      <Trans>Limit Order</Trans>{' '}
+      <Trans>Limit Order</Trans>
       {!!numberOfActiveOrders && (
         <MouseoverTooltip placement="top" text={<Trans>You have {numberOfActiveOrders} active orders.</Trans>}>
-          <span className="inline-block min-w-[18px] rounded-[20px] bg-primary-30 px-1.5 py-0.5 text-xs font-medium text-primary">
+          <span className="min-w-4 rounded-full bg-primary-30 px-1.5 py-px text-xs font-medium text-primary">
             {numberOfActiveOrders}
           </span>
         </MouseoverTooltip>

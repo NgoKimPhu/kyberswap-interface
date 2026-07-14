@@ -10,6 +10,8 @@ import { APP_PATHS } from 'constants/index'
 import { NETWORKS_INFO } from 'constants/networks'
 import { useActiveWeb3React, useWeb3React } from 'hooks'
 import { useActiveLocale } from 'hooks/useActiveLocale'
+import { useIsSmartAccount } from 'hooks/useIsSmartAccount'
+import { restrictedTokenMessage, useIsTokenAddressRestricted } from 'hooks/useRestrictedTokens'
 import useTracking, { TRACKING_EVENT_TYPE } from 'hooks/useTracking'
 import { useChangeNetwork } from 'hooks/web3/useChangeNetwork'
 import { EARN_DEXES, Exchange } from 'pages/Earns/constants'
@@ -17,6 +19,7 @@ import useAccountChanged from 'pages/Earns/hooks/useAccountChanged'
 import { CheckClosedPositionParams } from 'pages/Earns/hooks/useClosedPositions'
 import useTransactionReplacement from 'pages/Earns/hooks/useTransactionReplacement'
 import { submitTransaction } from 'pages/Earns/utils'
+import { navigateToPoolDetail } from 'pages/Earns/utils/zap'
 import { useKyberSwapConfig, useNotify, useWalletModalToggle } from 'state/application/hooks'
 import { useTransactionAdder } from 'state/transactions/hooks'
 import { TRANSACTION_TYPE } from 'state/transactions/type'
@@ -31,6 +34,8 @@ export interface ZapOutInfo {
     chainId: number
     poolAddress: string
     id: string
+    // Pool tokens, used to block the zap-out (trade) path for geo-restricted tokens.
+    tokens?: { address: string; symbol?: string }[]
   }
 }
 
@@ -68,7 +73,9 @@ const useZapOutWidget = (
   const refCode = getCookieValue('refCode')
   const { isSmartConnector } = useWeb3React()
   const { account, chainId } = useActiveWeb3React()
+  const isSmartAccount = useIsSmartAccount()
   const { changeNetwork } = useChangeNetwork()
+  const isAddressRestricted = useIsTokenAddressRestricted()
 
   const [zapOutPureParams, setZapOutPureParams] = useState<{
     positionId: string
@@ -118,22 +125,23 @@ const useZapOutWidget = (
             ...zapOutPureParams,
             source: 'kyberswap-earn',
             rpcUrl: zapOutRpcUrl,
-            // Skip the permit path for smart-wallet connectors (Porto, Safe).
-            // Their signatures are EIP-1271 contract signatures; the on-chain
-            // NFT `permit()` recovers them via ecrecover and gets a different
-            // address than the wallet, so estimateGas reverts with
-            // NOT_AUTHORIZED. Omitting `signTypedData` makes the widget fall
-            // back to the approve flow, which works for smart wallets.
-            signTypedData: isSmartConnector
-              ? undefined
-              : async (account: string, typedDataJson: string) => {
-                  const parsedTypedData = JSON.parse(typedDataJson)
-                  return signTypedDataRaw({
-                    chainId: chainId,
-                    account: account.toLowerCase() as Address,
-                    typedData: parsedTypedData,
-                  })
-                },
+            // Skip the permit path for smart wallets — both connector-level
+            // (Porto, Safe) and account-level ones detected via bytecode /
+            // EIP-5792 (Coinbase Smart Wallet, Argent, Ambire, EIP-7702 EOAs).
+            // Their EIP-1271 contract signatures don't verify on the NFT
+            // `permit()`, so estimateGas reverts. Omitting `signTypedData` makes
+            // the widget fall back to the approve flow, which works for them.
+            signTypedData:
+              isSmartConnector || isSmartAccount
+                ? undefined
+                : async (account: string, typedDataJson: string) => {
+                    const parsedTypedData = JSON.parse(typedDataJson)
+                    return signTypedDataRaw({
+                      chainId: chainId,
+                      account: account.toLowerCase() as Address,
+                      typedData: parsedTypedData,
+                    })
+                  },
             referral: refCode,
             connectedAccount: {
               address: account,
@@ -163,6 +171,12 @@ const useZapOutWidget = (
             },
             onConnectWallet: toggleWalletModal,
             onSwitchChain: () => changeNetwork(zapOutPureParams.chainId as number),
+            onOpenPoolDetail: (pool: { chainId: number; poolAddress: string; dexId?: string }) => {
+              if (!pool.dexId) return
+              setZapOutPureParams(null)
+              clearTracking()
+              navigateToPoolDetail(pool, navigate)
+            },
             onSubmitTx: async (
               txData: { from: string; to: string; value: string; data: string },
               additionalInfo?:
@@ -268,6 +282,7 @@ const useZapOutWidget = (
       zapOutPureParams,
       zapOutRpcUrl,
       isSmartConnector,
+      isSmartAccount,
       refCode,
       account,
       chainId,
@@ -298,6 +313,15 @@ const useZapOutWidget = (
         5_000,
       )
       return
+    }
+
+    // Block the zap-out (trade) path for geo-restricted tokens; withdraw-only exits stay allowed.
+    if (mode !== 'withdrawOnly') {
+      const restrictedToken = position.tokens?.find(token => isAddressRestricted(position.chainId, token.address))
+      if (restrictedToken) {
+        notify({ title: restrictedTokenMessage(restrictedToken.symbol), type: NotificationType.WARNING }, 4_000)
+        return
+      }
     }
 
     setZapOutPureParams({
